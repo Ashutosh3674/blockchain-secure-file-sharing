@@ -154,26 +154,28 @@ export const Navbar = ({
             </button>
           )}
 
-          {/* Security Center Button */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onOpenSecurity}
-            title="Open Enterprise Security Control Center (bcrypt, JWT, HTTPS, Firewall)"
-            style={{
-              fontSize: '0.8rem',
-              padding: '0.35rem 0.85rem',
-              borderColor: 'rgba(0, 242, 254, 0.4)',
-              background: 'rgba(0, 242, 254, 0.08)',
-              color: 'var(--accent-cyan)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-            }}
-          >
-            <Shield size={15} />
-            <span style={{ fontWeight: 600 }}>Security Center</span>
-          </button>
+          {/* Security Center Button - Strictly Restricted to Admin */}
+          {user?.role === 'admin' && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onOpenSecurity}
+              title="Open Enterprise Security Control Center (Administrator Only)"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.35rem 0.85rem',
+                borderColor: 'rgba(0, 242, 254, 0.4)',
+                background: 'rgba(0, 242, 254, 0.08)',
+                color: 'var(--accent-cyan)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <Shield size={15} />
+              <span style={{ fontWeight: 600 }}>Security Center</span>
+            </button>
+          )}
 
           {/* 🔔 Real-Time Notifications Center */}
           <NotificationsDropdown onShowToast={onShowToast} />

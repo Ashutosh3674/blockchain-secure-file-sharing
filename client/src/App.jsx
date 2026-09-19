@@ -163,7 +163,13 @@ export function App() {
         <Navbar
           onOpenAuth={handleOpenAuth}
           onNavigateHome={handleNavigateHome}
-          onOpenSecurity={() => setSecurityModalOpen(true)}
+          onOpenSecurity={() => {
+            if (user?.role === 'admin') {
+              setSecurityModalOpen(true);
+            } else {
+              showToast('Access Denied: Security Control Center is restricted to Administrators.', 'error');
+            }
+          }}
           onOpenAdmin={() => {
             if (user?.role === 'admin') {
               setAdminModalOpen(true);
@@ -253,12 +259,14 @@ export function App() {
         }}
       />
 
-      {/* Enterprise Security Control Center Modal */}
-      <SecurityCenterModal
-        isOpen={securityModalOpen}
-        onClose={() => setSecurityModalOpen(false)}
-        onShowToast={showToast}
-      />
+      {/* Enterprise Security Control Center Modal (Strictly for Enterprise Admins) */}
+      {user?.role === 'admin' && (
+        <SecurityCenterModal
+          isOpen={securityModalOpen}
+          onClose={() => setSecurityModalOpen(false)}
+          onShowToast={showToast}
+        />
+      )}
 
       {/* Admin Panel Dashboard Modal (Strictly for Enterprise Admins) */}
       {user?.role === 'admin' && (
