@@ -86,7 +86,7 @@ Project: BlockShare Enterprise Web3 Architecture
 Lead Author: Ashutosh
 Recipient: Rahul Sharma
 Date: ${new Date().toLocaleDateString()}
-Classification: TOP SECRET // AES-256 ENCRYPTED
+Classification: TOP SECRET // AES-256-GCM ENCRYPTED
 
 1. EXECUTIVE SUMMARY:
 Decentralized file sharing solves central point of failure risks 
@@ -272,7 +272,7 @@ distributed IPFS storage and Ethereum smart contract access control.
             <div>
               <h3 style={{ fontSize: '1.25rem' }}>Secure File Upload Pipeline</h3>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Client-Side AES-256 &bull; SHA-256 &bull; IPFS CID &bull; Smart Contract
+                Client-Side AES-256-GCM &bull; SHA-256 &bull; IPFS CID &bull; Smart Contract
               </p>
             </div>
           </div>
@@ -582,7 +582,7 @@ distributed IPFS storage and Ethereum smart contract access control.
 
               {cryptoDetails.keyString && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>AES-256 Key:</span>
+                  <span style={{ color: 'var(--text-muted)' }}>AES-256-GCM Key:</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <code className="mono" style={{ color: '#fca34d' }}>
                       {cryptoDetails.keyString.slice(0, 16)}...

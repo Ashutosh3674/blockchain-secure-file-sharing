@@ -275,7 +275,7 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginTop: '4px', color: 'var(--text-muted)' }}>
                   <span>Strength: <b style={{ color: strength > 2 ? 'var(--accent-emerald)' : '#f97316' }}>{strengthLabels[strength]}</b></span>
-                  <span>Hashed with bcrypt (10 rounds)</span>
+                  <span>Hashed with bcrypt (12 rounds)</span>
                 </div>
               </div>
             )}

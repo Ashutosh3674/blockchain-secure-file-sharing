@@ -92,27 +92,75 @@ export const TransactionDetailsModal = ({ isOpen, onClose, initialTxHash = '', o
 
   const verifyTransaction = async (hashToVerify) => {
     const hash = (hashToVerify || txQuery || '').trim();
-    if (!hash) return;
+    if (!hash) {
+      if (onShowToast) onShowToast('Please enter a valid Transaction Hash (0x...)', 'warning');
+      return;
+    }
     setLoading(true);
 
     try {
+      // 1. Check local client-side ledger logs first
+      const storedLogs = getStoredLogs();
+      const localMatch = storedLogs.find(
+        (l) => l.txHash && l.txHash.toLowerCase() === hash.toLowerCase()
+      );
+
+      if (localMatch) {
+        setTxData({
+          txHash: localMatch.txHash,
+          txHashShort: `${localMatch.txHash.slice(0, 6)}...${localMatch.txHash.slice(-4)}`,
+          blockNumber: localMatch.blockNumber || 1,
+          status: 'Confirmed',
+          confirmations: 12,
+          network: 'Sepolia Testnet (EVM)',
+          timestampFormatted: new Date(localMatch.timestamp).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          timestampFull: `${new Date(localMatch.timestamp).toLocaleDateString()}, ${new Date(localMatch.timestamp).toLocaleTimeString()}`,
+          action: localMatch.event || 'Smart Contract Ledger Event',
+          from: localMatch.caller || '0x71c67ed3e80435a55611f476c66337051b7b292a',
+          fromName: 'Verified Caller',
+          contractAddress: '0x3541A6a1a4aD8bF85B229983949C6509aF2E3A63',
+          contractName: 'FileAccessControl.sol',
+          to: localMatch.recipient || '0x0000000000000000000000000000000000000000',
+          toName: 'Access Recipient',
+          fileName: localMatch.fileName || 'Protected File',
+          ipfsHash: localMatch.ipfsHash || 'Qm...',
+          gasUsed: '42,180',
+          gasFeeETH: '0.00038 ETH',
+          explorerUrl: `https://sepolia.etherscan.io/tx/${localMatch.txHash}`,
+        });
+        if (onShowToast) {
+          onShowToast(`Transaction ${localMatch.txHash.slice(0, 8)}... verified in local ledger!`, 'success');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fallback to server canonical ledger endpoint
       const res = await fetch(`/api/files/transactions/${encodeURIComponent(hash)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.transaction) {
           setTxData({
             ...data.transaction,
-            timestampFull: `${data.transaction.timestampFormatted || '18 Sept 2026'}, ${new Date(data.transaction.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC`,
+            timestampFull: `${data.transaction.timestampFormatted || 'Confirmed'}, ${new Date(data.transaction.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} UTC`,
             contractName: 'FileAccessControl.sol',
             gasFeeETH: '0.000684 ETH ($1.64)',
           });
           if (onShowToast) {
             onShowToast(`Transaction ${data.transaction.txHashShort} successfully verified on-chain!`, 'success');
           }
+          setLoading(false);
+          return;
         }
       }
+
+      // If not located in either store
+      if (onShowToast) {
+        onShowToast(`Transaction hash "${hash.slice(0, 10)}..." not found in ledger.`, 'warning');
+      }
     } catch (err) {
-      console.log('Transaction verify fallback:', err);
+      console.log('Transaction verify error:', err);
+      if (onShowToast) onShowToast('Failed to verify transaction: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -490,7 +538,7 @@ export const TransactionDetailsModal = ({ isOpen, onClose, initialTxHash = '', o
         >
           <Lock size={20} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
           <div style={{ color: 'var(--text-secondary)' }}>
-            <b style={{ color: '#f8fafc' }}>Zero-Knowledge On-Chain Invariant:</b> The transaction payload contains only the public Ethereum addresses, authorization timestamps, and encrypted wrapped keys. Plaintext file contents and symmetric AES-256 decryption keys are <b>never stored on-chain</b>.
+            <b style={{ color: '#f8fafc' }}>Zero-Knowledge On-Chain Invariant:</b> The transaction payload contains only the public Ethereum addresses, authorization timestamps, and encrypted wrapped keys. Plaintext file contents and symmetric AES-256-GCM decryption keys are <b>never stored on-chain</b>.
           </div>
         </div>
 

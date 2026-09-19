@@ -108,7 +108,7 @@ export const Dashboard = ({ onShowToast }) => {
       const randomHash = 'Qm' + Array.from(crypto.getRandomValues(new Uint8Array(22))).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 44);
       setEncryptedHash(randomHash);
       try { confetti({ particleCount: 40 }); } catch {}
-      onShowToast('File encrypted with AES-256 and mapped to IPFS CID hash!');
+      onShowToast('File encrypted with AES-256-GCM and mapped to IPFS CID hash!');
     }, 1200);
   };
 
@@ -141,7 +141,7 @@ export const Dashboard = ({ onShowToast }) => {
               Welcome back, <span className="gradient-text">{user?.name || 'Ashutosh'}</span>!
             </h1>
             <p style={{ color: 'var(--text-secondary)', maxWidth: '650px', fontSize: '1rem' }}>
-              Your account is cryptographically secured with <b>bcrypt (10 salt rounds)</b> and linked to Ethereum EVM Smart Contract Access Control.
+              Your account is cryptographically secured with <b>bcrypt (12 salt rounds)</b> and linked to Ethereum EVM Smart Contract Access Control.
             </p>
           </div>
 
@@ -501,7 +501,7 @@ export const Dashboard = ({ onShowToast }) => {
                   <span className="badge badge-cyan">Role: {user?.role || 'User'}</span>
                   <span className="badge badge-emerald">
                     <CheckCircle2 size={12} />
-                    bcrypt 10-Salt
+                    bcrypt 12-Salt
                   </span>
                 </div>
               </div>

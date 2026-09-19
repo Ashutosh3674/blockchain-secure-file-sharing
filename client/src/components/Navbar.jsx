@@ -16,11 +16,24 @@ export const Navbar = ({
   isVerifyPage,
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { account, networkName, isConnecting, connectWallet, disconnectWallet } = useWeb3();
+  const { account, networkName, isConnecting, hasProvider, connectWallet, disconnectWallet } = useWeb3();
 
   const truncateAddress = (addr) => {
     if (!addr) return '';
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
+  const handleWalletConnect = async () => {
+    const res = await connectWallet(false);
+    if (res?.success) {
+      if (res.message) {
+        if (onShowToast) onShowToast(res.message, 'info');
+      } else {
+        if (onShowToast) onShowToast(`MetaMask Connected: ${res.address.slice(0, 6)}...${res.address.slice(-4)}`, 'success');
+      }
+    } else if (res?.error) {
+      if (onShowToast) onShowToast(res.error, 'error');
+    }
   };
 
   const handleBrandClick = () => {
@@ -227,12 +240,13 @@ export const Navbar = ({
           ) : (
             <button
               className="btn btn-wallet"
-              onClick={() => connectWallet(false)}
+              onClick={handleWalletConnect}
               disabled={isConnecting}
+              title={hasProvider ? "Connect MetaMask Web3 Wallet" : "MetaMask not detected in browser — Click to initialize secure In-Browser Web3 session"}
               style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
             >
               <Wallet size={16} />
-              <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+              <span>{isConnecting ? 'Connecting...' : (hasProvider ? 'Connect Wallet' : 'Web3 Session')}</span>
             </button>
           )}
 

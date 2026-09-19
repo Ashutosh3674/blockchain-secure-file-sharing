@@ -20,7 +20,7 @@ export const Hero = ({ onOpenAuth }) => {
       </h1>
 
       <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', maxWidth: '750px', margin: '0 auto 2.5rem', lineHeight: 1.6 }}>
-        Zero-knowledge file encryption meets Ethereum smart contract access control. Protect sensitive files with client-side <b>AES-256</b> encryption, decentralized <b>IPFS storage</b>, and tamper-proof blockchain permissions.
+        Zero-knowledge file encryption meets Ethereum smart contract access control. Protect sensitive files with client-side <b>AES-256-GCM</b> encryption, decentralized <b>IPFS storage</b>, and tamper-proof blockchain permissions.
       </p>
 
       {/* Call to Actions */}
@@ -63,7 +63,7 @@ export const Hero = ({ onOpenAuth }) => {
           </div>
           <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>1. User Auth & Wallet Linking</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-            Users sign up with hashed credentials using <b>bcrypt (10 salt rounds)</b> and link their EVM wallet (MetaMask) to bridge Web2 login with Web3 cryptographic identity.
+            Users sign up with hashed credentials using <b>bcrypt (12 salt rounds)</b> and link their EVM wallet (MetaMask) to bridge Web2 login with Web3 cryptographic identity.
           </p>
           <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)', fontSize: '0.8rem', fontWeight: 600 }}>
             <CheckCircle size={14} />
@@ -86,12 +86,12 @@ export const Hero = ({ onOpenAuth }) => {
           }}>
             <Cpu size={22} />
           </div>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>2. Client-Side Encryption</h3>
+          <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>2. Client-Side AES-256-GCM Encryption</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-            Every file is encrypted in the browser using symmetric <b>AES-GCM 256-bit</b> encryption before being transferred. Plaintext data never leaves your device.
+            Every file is encrypted in the browser using symmetric <b>AES-256-GCM (Galois/Counter Mode with 96-bit random IV)</b> authenticated encryption before being transferred. Plaintext data never leaves your device.
           </p>
           <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontSize: '0.8rem', fontWeight: 600 }}>
-            <span>Next Feature</span>
+            <span>Zero-Knowledge Ready</span>
           </div>
         </div>
 

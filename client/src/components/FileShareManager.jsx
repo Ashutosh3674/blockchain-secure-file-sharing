@@ -179,6 +179,28 @@ export const FileShareManager = ({ onShowToast }) => {
     refreshData();
   }, []);
 
+  useEffect(() => {
+    if (account) {
+      setActivePersona({
+        id: 'connected_metamask',
+        name: 'Connected MetaMask',
+        address: account.toLowerCase(),
+        role: 'Active Wallet',
+        color: '#fca34d',
+        badgeClass: 'badge-purple',
+      });
+    } else if (user?.walletAddress) {
+      setActivePersona({
+        id: 'account_wallet',
+        name: user.name ? `${user.name} (Account)` : 'My Account Wallet',
+        address: user.walletAddress.toLowerCase(),
+        role: 'Account Owner',
+        color: '#00f2fe',
+        badgeClass: 'badge-cyan',
+      });
+    }
+  }, [account, user]);
+
   const refreshData = () => {
     setFiles(getStoredFiles());
     setLogs(getStoredLogs());
@@ -252,7 +274,7 @@ export const FileShareManager = ({ onShowToast }) => {
         await cryptoService.decryptFile(ciphertextBuffer, iv, keyString, file.fileName, file.fileType);
         await contractService.recordDownload(file.ipfsHash, activePersona.address);
         try { confetti({ particleCount: 50 }); } catch {}
-        onShowToast(`File "${file.fileName}" decrypted with AES-256 and downloaded!`);
+        onShowToast(`File "${file.fileName}" decrypted with AES-256-GCM and downloaded!`);
         refreshData();
       } catch (decryptErr) {
         // Fallback plain file download
