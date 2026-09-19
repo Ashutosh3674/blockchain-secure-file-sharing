@@ -208,7 +208,9 @@ distributed IPFS storage and Ethereum smart contract access control.
         file.type || 'application/pdf',
         file.size,
         activeAddress,
-        sha256
+        sha256,
+        exportedKey,
+        encryptionResult.iv
       );
 
       // Also attach secret key to local cache so owner/authorized users can decrypt it

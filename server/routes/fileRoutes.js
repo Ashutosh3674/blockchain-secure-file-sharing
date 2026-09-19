@@ -13,11 +13,43 @@ const {
   setUploadLimitMB,
 } = require('../middleware/validation');
 
-// Ensure IPFS storage directory exists
-const IPFS_DIR = path.join(__dirname, '..', 'data', 'ipfs_storage');
+// Ensure IPFS storage directory & data directory exist
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const FILES_DATA_FILE = path.join(DATA_DIR, 'files.json');
+const IPFS_DIR = path.join(DATA_DIR, 'ipfs_storage');
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 if (!fs.existsSync(IPFS_DIR)) {
   fs.mkdirSync(IPFS_DIR, { recursive: true });
 }
+
+// Helpers for persistent server-side files registry
+const loadServerFiles = () => {
+  try {
+    if (fs.existsSync(FILES_DATA_FILE)) {
+      const content = fs.readFileSync(FILES_DATA_FILE, 'utf-8');
+      return JSON.parse(content || '[]');
+    }
+  } catch (err) {
+    console.error('Error loading files.json:', err.message);
+  }
+  return [];
+};
+
+const saveServerFiles = (filesList) => {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(FILES_DATA_FILE, JSON.stringify(filesList, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving files.json:', err.message);
+  }
+};
+
+let SERVER_SHARE_REGISTRY = loadServerFiles();
 
 // Base58 encoder for standard IPFS CIDv0 (Qm...)
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -114,6 +146,7 @@ router.post('/ipfs-upload', uploadRateLimiter, validateFileType, validateUploadS
     } else {
       SERVER_SHARE_REGISTRY.unshift(fileRecord);
     }
+    saveServerFiles(SERVER_SHARE_REGISTRY);
 
     res.status(200).json({
       success: true,
@@ -258,9 +291,6 @@ router.post('/crypto-shred/:ipfsHash', (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// Server file metadata registry (populated dynamically on upload)
-const SERVER_SHARE_REGISTRY = [];
 
 // Helper: Standardized 9-field Metadata Formatter
 const formatServerFileMetadata = (file) => {
@@ -473,6 +503,7 @@ router.put('/share-mode/:ipfsHash', (req, res) => {
     }
 
     file.isPublic = !!isPublic;
+    saveServerFiles(SERVER_SHARE_REGISTRY);
 
     res.status(200).json({
       success: true,
@@ -481,6 +512,153 @@ router.put('/share-mode/:ipfsHash', (req, res) => {
       mode: file.isPublic ? 'Public' : 'Private',
       message: `Sharing mode changed to ${file.isPublic ? 'PUBLIC (Anyone with link)' : 'PRIVATE (Selected recipient only - Default)'}`,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Get complete active files registry (Synchronized across all users/browsers)
+// @route   GET /api/files/registry
+// @access  Public
+router.get('/registry', (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      count: SERVER_SHARE_REGISTRY.length,
+      files: SERVER_SHARE_REGISTRY,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @desc    Register / Sync a file from client to central backend registry
+// @route   POST /api/files/register
+// @access  Public / Authenticated
+router.post('/register', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash, fileName, fileType, fileSize, owner, ownerName, sha256Hash, isPublic, encryptionKey, iv } = req.body;
+    if (!ipfsHash) {
+      return res.status(400).json({ success: false, message: 'ipfsHash is required' });
+    }
+    const shareId = sha256Hash ? sha256Hash.slice(0, 8) : ipfsHash.slice(2, 10);
+    const existingIndex = SERVER_SHARE_REGISTRY.findIndex((f) => f.ipfsHash === ipfsHash);
+
+    const cleanOwner = (owner || (req.user && req.user.walletAddress) || '0x71c67ed3e80435a55611f476c66337051b7b292a').toLowerCase();
+    const cleanOwnerName = ownerName || (req.user && req.user.name) || 'Ashutosh';
+
+    const fileRecord = {
+      shareId,
+      ipfsHash,
+      fileName: fileName || 'file',
+      fileType: fileType || 'application/octet-stream',
+      fileSize: Number(fileSize) || 0,
+      isPublic: !!isPublic,
+      status: 'active',
+      sha256Hash: sha256Hash || '',
+      owner: cleanOwner,
+      ownerName: cleanOwnerName,
+      uploadedAt: Date.now(),
+      authorizedRecipients: existingIndex !== -1 ? (SERVER_SHARE_REGISTRY[existingIndex].authorizedRecipients || []) : [],
+      permissions: existingIndex !== -1 ? (SERVER_SHARE_REGISTRY[existingIndex].permissions || {}) : {},
+      wrappedKeys: existingIndex !== -1 ? (SERVER_SHARE_REGISTRY[existingIndex].wrappedKeys || {}) : {},
+      encryptionKey: encryptionKey || (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].encryptionKey : undefined),
+      iv: iv || (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].iv : undefined),
+    };
+
+    if (existingIndex !== -1) {
+      SERVER_SHARE_REGISTRY[existingIndex] = { ...SERVER_SHARE_REGISTRY[existingIndex], ...fileRecord };
+    } else {
+      SERVER_SHARE_REGISTRY.unshift(fileRecord);
+    }
+
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`📁 [File Registered] "${fileName}" synced to central server registry by ${cleanOwner}`);
+    res.status(200).json({ success: true, file: fileRecord });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Grant Access on Central Server (Accessible to recipient from any device/browser)
+// @route   POST /api/files/grant-access
+// @access  Public / Authenticated
+router.post('/grant-access', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash, recipientAddress, recipientEmail, wrappedKey, expiresAt, maxDownloads } = req.body;
+    if (!ipfsHash || !recipientAddress) {
+      return res.status(400).json({ success: false, message: 'ipfsHash and recipientAddress are required' });
+    }
+
+    const cleanRecipient = recipientAddress.toLowerCase().trim();
+    let file = SERVER_SHARE_REGISTRY.find((f) => f.ipfsHash === ipfsHash);
+
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found in server registry' });
+    }
+
+    if (!file.authorizedRecipients) file.authorizedRecipients = [];
+    if (!file.authorizedRecipients.includes(cleanRecipient)) {
+      file.authorizedRecipients.push(cleanRecipient);
+    }
+    if (recipientEmail && typeof recipientEmail === 'string') {
+      const cleanEmail = recipientEmail.toLowerCase().trim();
+      if (!file.authorizedRecipients.includes(cleanEmail)) {
+        file.authorizedRecipients.push(cleanEmail);
+      }
+    }
+
+    if (!file.permissions) file.permissions = {};
+    file.permissions[cleanRecipient] = {
+      isAuthorized: true,
+      expiresAt: Number(expiresAt) || 0,
+      maxDownloads: Number(maxDownloads) || 0,
+      downloadCount: (file.permissions[cleanRecipient] && file.permissions[cleanRecipient].downloadCount) || 0,
+    };
+
+    if (wrappedKey) {
+      if (!file.wrappedKeys) file.wrappedKeys = {};
+      file.wrappedKeys[cleanRecipient] = wrappedKey;
+    }
+
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`🤝 [Access Granted] File "${file.fileName}" access granted to ${cleanRecipient} on server`);
+    res.status(200).json({ success: true, file });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Revoke Access on Central Server
+// @route   POST /api/files/revoke-access
+// @access  Public / Authenticated
+router.post('/revoke-access', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash, recipientAddress } = req.body;
+    if (!ipfsHash || !recipientAddress) {
+      return res.status(400).json({ success: false, message: 'ipfsHash and recipientAddress are required' });
+    }
+
+    const cleanRecipient = recipientAddress.toLowerCase().trim();
+    let file = SERVER_SHARE_REGISTRY.find((f) => f.ipfsHash === ipfsHash);
+
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found in server registry' });
+    }
+
+    if (file.authorizedRecipients) {
+      file.authorizedRecipients = file.authorizedRecipients.filter((r) => r.toLowerCase() !== cleanRecipient);
+    }
+    if (file.permissions && file.permissions[cleanRecipient]) {
+      file.permissions[cleanRecipient].isAuthorized = false;
+    }
+    if (file.wrappedKeys && file.wrappedKeys[cleanRecipient]) {
+      delete file.wrappedKeys[cleanRecipient];
+    }
+
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`🚫 [Access Revoked] File "${file.fileName}" access revoked from ${cleanRecipient} on server`);
+    res.status(200).json({ success: true, file });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

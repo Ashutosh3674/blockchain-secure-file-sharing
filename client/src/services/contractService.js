@@ -152,8 +152,59 @@ const generateMockTxHash = () => {
 
 // Contract Methods Wrapper
 export const contractService = {
+  // 0. Synchronize local storage with central backend server registry
+  async syncWithServer() {
+    try {
+      const res = await fetch('/api/files/registry');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.files)) {
+          const localFiles = getStoredFiles();
+          const map = new Map();
+          // Seed with local files
+          localFiles.forEach((f) => {
+            if (f && f.ipfsHash) map.set(f.ipfsHash.toLowerCase(), f);
+          });
+          // Merge server files
+          data.files.forEach((sf) => {
+            if (!sf || !sf.ipfsHash) return;
+            const key = sf.ipfsHash.toLowerCase();
+            const existing = map.get(key);
+            if (existing) {
+              map.set(key, {
+                ...existing,
+                ...sf,
+                encryptionKey: existing.encryptionKey || sf.encryptionKey,
+                iv: existing.iv || sf.iv,
+                authorizedRecipients: Array.from(
+                  new Set([...(existing.authorizedRecipients || []), ...(sf.authorizedRecipients || [])])
+                ),
+                permissions: {
+                  ...(existing.permissions || {}),
+                  ...(sf.permissions || {}),
+                },
+                wrappedKeys: {
+                  ...(existing.wrappedKeys || {}),
+                  ...(sf.wrappedKeys || {}),
+                },
+              });
+            } else {
+              map.set(key, sf);
+            }
+          });
+          const merged = Array.from(map.values());
+          saveStoredFiles(merged);
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.warn('Sync with server error:', e.message);
+    }
+    return getStoredFiles();
+  },
+
   // 1. Register File on Blockchain
-  async registerFile(ipfsHash, fileName, fileType, fileSize, currentAddress, sha256Hash = '') {
+  async registerFile(ipfsHash, fileName, fileType, fileSize, currentAddress, sha256Hash = '', encryptionKey = '', iv = null) {
     const cleanAddress = (currentAddress || '0x71c67ed3e80435a55611f476c66337051b7b292a').toLowerCase();
     const files = getStoredFiles();
 
@@ -174,10 +225,35 @@ export const contractService = {
       owner: cleanAddress,
       uploadedAt: Date.now(),
       authorizedRecipients: [],
+      permissions: {},
+      wrappedKeys: {},
+      encryptionKey: encryptionKey || undefined,
+      iv: iv || undefined,
     };
 
     files.unshift(newRecord);
     saveStoredFiles(files);
+
+    // Sync to central server registry so other users/browsers see this file
+    try {
+      await fetch('/api/files/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ipfsHash,
+          fileName,
+          fileType,
+          fileSize,
+          owner: cleanAddress,
+          sha256Hash,
+          isPublic: false,
+          encryptionKey,
+          iv,
+        }),
+      });
+    } catch (e) {
+      console.warn('Server registration sync error:', e);
+    }
 
     const tx = {
       txHash: generateMockTxHash(),
@@ -243,9 +319,10 @@ export const contractService = {
   },
 
   // 2. Grant Access to Recipient (with wrapped AES key, optional expiry & max download quota)
-  async grantAccess(ipfsHash, recipientAddress, currentAddress, wrappedKey = null, expiresAt = 0, maxDownloads = 0) {
+  async grantAccess(ipfsHash, recipientAddress, currentAddress, wrappedKey = null, expiresAt = 0, maxDownloads = 0, recipientEmail = '') {
     const cleanAddress = (currentAddress || '').toLowerCase();
-    const cleanRecipient = (recipientAddress || '').toLowerCase();
+    const cleanRecipient = (recipientAddress || '').toLowerCase().trim();
+    const cleanEmail = (recipientEmail || '').toLowerCase().trim();
 
     if (!cleanRecipient.startsWith('0x') || cleanRecipient.length !== 42) {
       throw new Error('Invalid Ethereum recipient address (must be 42 characters starting with 0x)');
@@ -263,26 +340,53 @@ export const contractService = {
       throw new Error(`Access Denied: Only file owner (${targetFile.owner.slice(0, 6)}...) can grant access. You are ${cleanAddress.slice(0, 6)}...`);
     }
 
+    if (!targetFile.authorizedRecipients) targetFile.authorizedRecipients = [];
     if (!targetFile.authorizedRecipients.includes(cleanRecipient)) {
       targetFile.authorizedRecipients.push(cleanRecipient);
+    }
+    if (cleanEmail && !targetFile.authorizedRecipients.includes(cleanEmail)) {
+      targetFile.authorizedRecipients.push(cleanEmail);
     }
 
     // Permissions with expiry & max download quota tracking
     if (!targetFile.permissions) targetFile.permissions = {};
-    targetFile.permissions[cleanRecipient] = {
+    const permObj = {
       isAuthorized: true,
       expiresAt: expiresAt || 0, // 0 = permanent, otherwise epoch ms
       maxDownloads: maxDownloads || 0, // 0 = unlimited, e.g. 3
       downloadCount: 0,
     };
+    targetFile.permissions[cleanRecipient] = permObj;
+    if (cleanEmail) {
+      targetFile.permissions[cleanEmail] = permObj;
+    }
 
     // Save Wrapped Key in on-chain metadata mapping
     if (!targetFile.wrappedKeys) targetFile.wrappedKeys = {};
     if (wrappedKey) {
       targetFile.wrappedKeys[cleanRecipient] = wrappedKey;
+      if (cleanEmail) targetFile.wrappedKeys[cleanEmail] = wrappedKey;
     }
 
     saveStoredFiles(files);
+
+    // Sync to backend server
+    try {
+      await fetch('/api/files/grant-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ipfsHash,
+          recipientAddress: cleanRecipient,
+          recipientEmail: cleanEmail || undefined,
+          wrappedKey,
+          expiresAt,
+          maxDownloads,
+        }),
+      });
+    } catch (e) {
+      console.warn('Server grant-access sync error:', e);
+    }
 
     const expiryDesc = expiresAt > 0 
       ? ` (Expires: ${new Date(expiresAt).toLocaleDateString()} ${new Date(expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
@@ -316,9 +420,10 @@ export const contractService = {
 
   getWrappedKey(ipfsHash, recipientAddress) {
     const files = getStoredFiles();
-    const targetFile = files.find((f) => f.ipfsHash === ipfsHash);
+    const targetFile = files.find((f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase()));
     if (!targetFile || !targetFile.wrappedKeys) return null;
-    return targetFile.wrappedKeys[recipientAddress.toLowerCase()] || null;
+    const clean = (recipientAddress || '').toLowerCase();
+    return targetFile.wrappedKeys[clean] || null;
   },
 
   // Record a successful download on-chain and increment download count
@@ -361,7 +466,7 @@ export const contractService = {
   // 3. Revoke Access from Recipient
   async revokeAccess(ipfsHash, recipientAddress, currentAddress) {
     const cleanAddress = (currentAddress || '').toLowerCase();
-    const cleanRecipient = (recipientAddress || '').toLowerCase();
+    const cleanRecipient = (recipientAddress || '').toLowerCase().trim();
 
     const files = getStoredFiles();
     const targetFile = files.find((f) => f.ipfsHash === ipfsHash);
@@ -374,7 +479,7 @@ export const contractService = {
       throw new Error(`Access Denied: Only file owner can revoke access.`);
     }
 
-    targetFile.authorizedRecipients = targetFile.authorizedRecipients.filter(
+    targetFile.authorizedRecipients = (targetFile.authorizedRecipients || []).filter(
       (r) => r.toLowerCase() !== cleanRecipient
     );
 
@@ -387,6 +492,20 @@ export const contractService = {
     }
 
     saveStoredFiles(files);
+
+    // Sync revocation to server
+    try {
+      await fetch('/api/files/revoke-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ipfsHash,
+          recipientAddress: cleanRecipient,
+        }),
+      });
+    } catch (e) {
+      console.warn('Server revoke-access sync error:', e);
+    }
 
     const tx = {
       txHash: generateMockTxHash(),
@@ -408,9 +527,10 @@ export const contractService = {
   },
 
   // 4. Verify Access Permission on Blockchain (with Time-Limited Expiry & Max Download Quota check)
-  hasAccess(ipfsHash, userAddress) {
-    if (!userAddress) return { hasAccess: false, reason: 'No wallet address provided' };
-    const clean = userAddress.toLowerCase();
+  hasAccess(ipfsHash, userAddress, userEmail = '') {
+    if (!userAddress && !userEmail) return { hasAccess: false, reason: 'No wallet address or user identity provided' };
+    const cleanAddr = (userAddress || '').toLowerCase();
+    const cleanEmail = (userEmail || '').toLowerCase();
     const files = getStoredFiles();
     const file = files.find((f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase()));
 
@@ -427,7 +547,7 @@ export const contractService = {
       };
     }
 
-    if (file.owner.toLowerCase() === clean) {
+    if (cleanAddr && file.owner && file.owner.toLowerCase() === cleanAddr) {
       return { hasAccess: true, role: 'Owner', mode: file.isPublic ? 'Public' : 'Private', reason: 'You are the file creator & owner' };
     }
 
@@ -441,8 +561,9 @@ export const contractService = {
       };
     }
 
-    const isAuthorized = file.authorizedRecipients.some((r) => r.toLowerCase() === clean);
-    const perm = file.permissions && file.permissions[clean];
+    const authorizedList = (file.authorizedRecipients || []).map((r) => r.toLowerCase());
+    const isAuthorized = (cleanAddr && authorizedList.includes(cleanAddr)) || (cleanEmail && authorizedList.includes(cleanEmail));
+    const perm = (file.permissions && (file.permissions[cleanAddr] || file.permissions[cleanEmail])) || null;
 
     if (isAuthorized && (!perm || perm.isAuthorized !== false)) {
       // Check block timestamp / expiry

@@ -87,10 +87,47 @@ export const FileShareManager = ({ onShowToast }) => {
   const { user } = useAuth();
   const { account } = useWeb3();
 
-  // Active persona (defaults to Ashutosh or user's linked wallet)
-  const [activePersona, setActivePersona] = useState(
-    account ? { id: 'custom', name: 'Connected MetaMask', address: account.toLowerCase(), role: 'Active Wallet', color: '#fca34d', badgeClass: 'badge-purple' } : PERSONAS[0]
-  );
+  // Dynamically compute list of personas (Logged In User account, Connected MetaMask, Demo accounts)
+  const availablePersonas = React.useMemo(() => {
+    const list = [];
+    if (user?.walletAddress) {
+      list.push({
+        id: 'user_account',
+        name: user.name ? `${user.name} (My Account)` : 'My Account',
+        address: user.walletAddress.toLowerCase(),
+        role: user.role === 'admin' ? 'Admin' : 'Registered User',
+        color: '#00f2fe',
+        badgeClass: 'badge-cyan',
+      });
+    }
+    if (account && (!user?.walletAddress || account.toLowerCase() !== user.walletAddress.toLowerCase())) {
+      list.push({
+        id: 'connected_metamask',
+        name: 'Connected MetaMask',
+        address: account.toLowerCase(),
+        role: 'Active Web3 Wallet',
+        color: '#fca34d',
+        badgeClass: 'badge-purple',
+      });
+    }
+    PERSONAS.forEach((p) => {
+      if (!list.some((item) => item.address.toLowerCase() === p.address.toLowerCase())) {
+        list.push(p);
+      }
+    });
+    return list;
+  }, [user, account]);
+
+  // Active persona (defaults to logged-in user or connected MetaMask, else Ashutosh)
+  const [activePersona, setActivePersona] = useState(() => {
+    if (account) {
+      return { id: 'custom', name: 'Connected MetaMask', address: account.toLowerCase(), role: 'Active Wallet', color: '#fca34d', badgeClass: 'badge-purple' };
+    }
+    if (user?.walletAddress) {
+      return { id: 'user_account', name: user.name ? `${user.name} (My Account)` : 'My Account', address: user.walletAddress.toLowerCase(), role: user.role === 'admin' ? 'Admin' : 'Registered User', color: '#00f2fe', badgeClass: 'badge-cyan' };
+    }
+    return PERSONAS[0];
+  });
 
   const [files, setFiles] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -120,10 +157,32 @@ export const FileShareManager = ({ onShowToast }) => {
   const [selectedTxHash, setSelectedTxHash] = useState('');
   const [isTxDetailsOpen, setIsTxDetailsOpen] = useState(false);
 
-  // Inbound shared files (owner != current active persona)
-  const sharedWithMeFiles = files.filter(
-    (f) => f.owner.toLowerCase() !== activePersona.address.toLowerCase()
-  );
+  // Inbound shared files (owner != current active persona/user, and user is an authorized recipient or file is public)
+  const sharedWithMeFiles = files.filter((f) => {
+    if (!f || !f.owner) return false;
+    const ownerAddr = f.owner.toLowerCase();
+    const activeAddr = (activePersona?.address || '').toLowerCase();
+    const userWallet = (user?.walletAddress || '').toLowerCase();
+    const userEmail = (user?.email || '').toLowerCase();
+
+    // If I am the file owner, it belongs in "My Files", not "Shared With Me"
+    if (ownerAddr === activeAddr || (userWallet && ownerAddr === userWallet)) {
+      return false;
+    }
+
+    // Check if recipient is authorized or file is public
+    const isRecipient = (f.authorizedRecipients || []).some((r) => {
+      if (!r) return false;
+      const cleanR = r.toLowerCase();
+      return (
+        cleanR === activeAddr ||
+        (userWallet && cleanR === userWallet) ||
+        (userEmail && cleanR === userEmail)
+      );
+    });
+
+    return f.isPublic === true || isRecipient;
+  });
 
   // Delete/Unregister File from Registry -> Opens 4-Stage Progressive Delete & Crypto-Shred Modal
   const handleDeleteFile = (file) => {
@@ -175,8 +234,28 @@ export const FileShareManager = ({ onShowToast }) => {
     }
   };
 
+  const refreshData = async () => {
+    try {
+      const synced = await contractService.syncWithServer();
+      setFiles(synced);
+    } catch {
+      setFiles(getStoredFiles());
+    }
+    setLogs(getStoredLogs());
+  };
+
   useEffect(() => {
     refreshData();
+    // Periodically sync so newly shared files appear across users without manual refresh
+    const interval = setInterval(() => {
+      refreshData();
+    }, 8000);
+    const handleFocus = () => refreshData();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -191,20 +270,15 @@ export const FileShareManager = ({ onShowToast }) => {
       });
     } else if (user?.walletAddress) {
       setActivePersona({
-        id: 'account_wallet',
-        name: user.name ? `${user.name} (Account)` : 'My Account Wallet',
+        id: 'user_account',
+        name: user.name ? `${user.name} (My Account)` : 'My Account',
         address: user.walletAddress.toLowerCase(),
-        role: 'Account Owner',
+        role: user.role === 'admin' ? 'Admin' : 'Registered User',
         color: '#00f2fe',
         badgeClass: 'badge-cyan',
       });
     }
   }, [account, user]);
-
-  const refreshData = () => {
-    setFiles(getStoredFiles());
-    setLogs(getStoredLogs());
-  };
 
   const truncate = (addr) => {
     if (!addr) return '';
@@ -261,8 +335,13 @@ export const FileShareManager = ({ onShowToast }) => {
       if (!keyString || file.owner.toLowerCase() !== activePersona.address.toLowerCase()) {
         const wrappedKey = contractService.getWrappedKey(file.ipfsHash, activePersona.address);
         if (wrappedKey) {
-          onShowToast(`Unwrapping AES key using ${activePersona.name}'s Private Key in browser memory...`);
-          keyString = await keyManagementService.unwrapFileKey(wrappedKey, activePersona.address);
+          try {
+            onShowToast(`Unwrapping AES key using ${activePersona.name}'s Private Key in browser memory...`);
+            keyString = await keyManagementService.unwrapFileKey(wrappedKey, activePersona.address);
+          } catch (unwrapErr) {
+            console.warn('Unwrap error, using file encryptionKey fallback:', unwrapErr);
+            keyString = file.encryptionKey || 'nF2zW8G3pK1qR7tX9vB4mC6jL8hY2sD5aF1eU9iO3wA=';
+          }
         } else {
           keyString = file.encryptionKey || 'nF2zW8G3pK1qR7tX9vB4mC6jL8hY2sD5aF1eU9iO3wA=';
         }
@@ -308,11 +387,23 @@ export const FileShareManager = ({ onShowToast }) => {
       onShowToast(`Fetching recipient's Public Key & wrapping AES file key with RSA-OAEP...`);
 
       // 1. Retrieve recipient's public key (e.g. Rahul's PK)
-      const recipientPubKey = await keyManagementService.getRecipientPublicKey(grantRecipientAddress);
+      let recipientPubKey = null;
+      try {
+        recipientPubKey = await keyManagementService.getRecipientPublicKey(grantRecipientAddress);
+      } catch (pkErr) {
+        console.warn('Could not generate recipient public key:', pkErr);
+      }
 
       // 2. Wrap the secret AES file key using recipient's public key
       const rawFileKey = selectedFileForGrant.encryptionKey || 'nF2zW8G3pK1qR7tX9vB4mC6jL8hY2sD5aF1eU9iO3wA=';
-      const wrappedKey = await keyManagementService.wrapFileKey(rawFileKey, recipientPubKey);
+      let wrappedKey = null;
+      if (recipientPubKey) {
+        try {
+          wrappedKey = await keyManagementService.wrapFileKey(rawFileKey, recipientPubKey);
+        } catch (wrapErr) {
+          console.warn('Wrap key error:', wrapErr);
+        }
+      }
 
       // 3. Grant access with time-limited expiry & max download quota
       const expiryHoursNum = parseFloat(grantExpiryHours) || 0;
@@ -325,7 +416,8 @@ export const FileShareManager = ({ onShowToast }) => {
         activePersona.address,
         wrappedKey,
         expiryMs,
-        maxDownloadsNum
+        maxDownloadsNum,
+        searchEmailQuery
       );
 
       if (res.success) {
@@ -337,7 +429,8 @@ export const FileShareManager = ({ onShowToast }) => {
         onShowToast(`Access granted to ${truncate(grantRecipientAddress)}${expiryMsg}${quotaMsg}!`);
         setSelectedFileForGrant(null);
         setGrantRecipientAddress('');
-        refreshData();
+        setSearchEmailQuery('');
+        await refreshData();
       }
     } catch (err) {
       onShowToast(err.message, 'error');
@@ -430,11 +523,11 @@ export const FileShareManager = ({ onShowToast }) => {
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            {PERSONAS.map((p) => {
+            {availablePersonas.map((p) => {
               const isSelected = activePersona.address.toLowerCase() === p.address.toLowerCase();
               return (
                 <button
-                  key={p.id}
+                  key={p.id || p.address}
                   onClick={() => handleSelectPersona(p)}
                   className="btn btn-secondary"
                   style={{
@@ -1352,8 +1445,15 @@ export const FileShareManager = ({ onShowToast }) => {
                 </thead>
                 <tbody>
                   {sharedWithMeFiles.map((file) => {
-                    const accessCheck = contractService.hasAccess(file.ipfsHash, activePersona.address);
-                    const perm = file.permissions && file.permissions[activePersona.address.toLowerCase()];
+                    const activeAddr = activePersona.address.toLowerCase();
+                    const userWallet = (user?.walletAddress || '').toLowerCase();
+                    const userEmail = (user?.email || '').toLowerCase();
+                    const accessCheck = contractService.hasAccess(file.ipfsHash, activePersona.address, userEmail);
+                    const perm = file.permissions && (
+                      file.permissions[activeAddr] ||
+                      (userWallet && file.permissions[userWallet]) ||
+                      (userEmail && file.permissions[userEmail])
+                    );
                     const isAuthorized = accessCheck.hasAccess;
 
                     // Formatted expiry display (e.g. 20 Sept, 25 Sept, 30 Sept)
