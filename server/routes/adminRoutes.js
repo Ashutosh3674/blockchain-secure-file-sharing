@@ -9,7 +9,6 @@ const { protect, requireAdmin } = require('../middleware/auth');
  * 🧑💼 adminRoutes.js
  * Enterprise Administration Portal API
  * Strictly protected by Role-Based Access Control (RBAC: role === 'admin')
- */
  *
  * Requirements:
  * 1. Admin dashboard headline metrics:
