@@ -337,19 +337,14 @@ const lookupUser = async (req, res) => {
 
     const cleanQuery = query.toLowerCase().trim();
 
-    // Default presets for quick demo testing if searching for rahul or ashutosh
-    if (cleanQuery.includes('rahul')) {
-      return res.status(200).json({
-        success: true,
-        user: {
-          name: 'Rahul Sharma',
-          email: 'rahul@gmail.com',
-          walletAddress: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
-        },
-      });
-    }
-
-    const found = await User.findOne({ email: cleanQuery });
+    // Search real registered users by email, exact name, or wallet address
+    const found = await User.findOne({
+      $or: [
+        { email: cleanQuery },
+        { name: new RegExp('^' + cleanQuery + '$', 'i') },
+        { walletAddress: cleanQuery },
+      ],
+    });
     if (found) {
       return res.status(200).json({
         success: true,

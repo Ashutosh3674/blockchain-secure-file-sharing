@@ -117,7 +117,7 @@ export const FileShareManager = ({ onShowToast }) => {
   const [activeTab, setActiveTab] = useState('files'); // 'files' | 'shared_with_me' | 'logs' | 'keys'
 
   // Blockchain Transaction Details Modal State
-  const [selectedTxHash, setSelectedTxHash] = useState('0x82A7b913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011');
+  const [selectedTxHash, setSelectedTxHash] = useState('');
   const [isTxDetailsOpen, setIsTxDetailsOpen] = useState(false);
 
   // Inbound shared files (owner != current active persona)
@@ -485,7 +485,7 @@ export const FileShareManager = ({ onShowToast }) => {
             <div style={{ background: 'rgba(0, 242, 254, 0.06)', border: '1px solid rgba(0, 242, 254, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>📁 My Files</span>
               <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-                15
+                {files.filter((f) => f.owner.toLowerCase() === activePersona.address.toLowerCase()).length}
               </span>
             </div>
 
@@ -504,7 +504,7 @@ export const FileShareManager = ({ onShowToast }) => {
             >
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>📥 Shared With Me</span>
               <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
-                {sharedWithMeFiles.length || 7}
+                {sharedWithMeFiles.length}
               </span>
             </div>
 
@@ -512,7 +512,7 @@ export const FileShareManager = ({ onShowToast }) => {
             <div style={{ background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>📤 Shared By Me</span>
               <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-purple)' }}>
-                9
+                {files.filter((f) => f.owner.toLowerCase() === activePersona.address.toLowerCase() && f.authorizedRecipients?.length > 0).length}
               </span>
             </div>
 
@@ -520,7 +520,7 @@ export const FileShareManager = ({ onShowToast }) => {
             <div style={{ background: 'rgba(56, 189, 248, 0.06)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>🟢 Active Shares</span>
               <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>
-                5
+                {files.reduce((acc, f) => acc + (f.owner.toLowerCase() === activePersona.address.toLowerCase() ? (Object.values(f.permissions || {}).filter(p => p.isAuthorized && (!p.expiresAt || p.expiresAt > Date.now())).length) : 0), 0)}
               </span>
             </div>
 
@@ -528,7 +528,7 @@ export const FileShareManager = ({ onShowToast }) => {
             <div style={{ background: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>⏰ Expired Shares</span>
               <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-rose)' }}>
-                4
+                {files.reduce((acc, f) => acc + (f.owner.toLowerCase() === activePersona.address.toLowerCase() ? (Object.values(f.permissions || {}).filter(p => p.isAuthorized && p.expiresAt && p.expiresAt <= Date.now()).length) : 0), 0)}
               </span>
             </div>
           </div>
@@ -553,32 +553,21 @@ export const FileShareManager = ({ onShowToast }) => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {/* Item 1 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FileText size={14} color="var(--accent-cyan)" />
-                  <span style={{ fontWeight: 600 }}>Report.pdf</span>
+              {logs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  No recent blockchain events recorded
                 </div>
-                <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>Uploaded</span>
-              </div>
-
-              {/* Item 2 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FileCode size={14} color="var(--accent-emerald)" />
-                  <span style={{ fontWeight: 600 }}>Resume.pdf</span>
-                </div>
-                <span className="badge badge-emerald" style={{ fontSize: '0.7rem' }}>Shared</span>
-              </div>
-
-              {/* Item 3 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FileSpreadsheet size={14} color="var(--accent-purple)" />
-                  <span style={{ fontWeight: 600 }}>Project.zip</span>
-                </div>
-                <span className="badge badge-purple" style={{ fontSize: '0.7rem' }}>Downloaded</span>
-              </div>
+              ) : (
+                logs.slice(0, 3).map((item, idx) => (
+                  <div key={item.txHash || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <FileText size={14} color="var(--accent-cyan)" />
+                      <span style={{ fontWeight: 600, fontSize: '0.8rem' }}>{item.details || item.event}</span>
+                    </div>
+                    <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>{item.event}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -766,9 +755,22 @@ export const FileShareManager = ({ onShowToast }) => {
             </div>
           )}
 
-          {files
-            .filter((f) => fileFilter === 'all' || f.owner.toLowerCase() === activePersona.address.toLowerCase())
-            .map((file) => {
+          {files.filter((f) => fileFilter === 'all' || f.owner.toLowerCase() === activePersona.address.toLowerCase()).length === 0 ? (
+            <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
+              <FileText size={44} style={{ opacity: 0.35, margin: '0 auto 0.75rem' }} />
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>No Files Uploaded Yet</h4>
+              <p style={{ margin: '0.5rem 0 1.25rem', fontSize: '0.85rem' }}>
+                Your decentralized file vault is currently empty. Encrypt and upload your first file to the blockchain.
+              </p>
+              <button className="btn btn-primary" onClick={() => setIsUploadModalOpen(true)} style={{ margin: '0 auto' }}>
+                <Plus size={16} />
+                <span>+ Upload & Encrypt File</span>
+              </button>
+            </div>
+          ) : (
+            files
+              .filter((f) => fileFilter === 'all' || f.owner.toLowerCase() === activePersona.address.toLowerCase())
+              .map((file) => {
               const isOwner = file.owner.toLowerCase() === activePersona.address.toLowerCase();
               const accessCheck = contractService.hasAccess(file.ipfsHash, activePersona.address);
               const hasAccess = accessCheck.hasAccess;
@@ -1261,7 +1263,8 @@ export const FileShareManager = ({ onShowToast }) => {
 
                 </div>
               );
-            })}
+            })
+          )}
         </div>
       )}
 
@@ -1331,12 +1334,6 @@ export const FileShareManager = ({ onShowToast }) => {
                     let expiryDisplay = 'No Expiry';
                     if (perm && perm.expiresAt > 0) {
                       expiryDisplay = new Date(perm.expiresAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-                    } else if (file.fileName === 'Report.pdf') {
-                      expiryDisplay = '20 Sept';
-                    } else if (file.fileName === 'Notes.pdf') {
-                      expiryDisplay = '25 Sept';
-                    } else if (file.fileName === 'Project.zip') {
-                      expiryDisplay = '30 Sept';
                     }
 
                     const senderName = file.ownerName || getPersonaNameByAddress(file.owner);
@@ -1559,107 +1556,125 @@ export const FileShareManager = ({ onShowToast }) => {
                 <span className="badge badge-cyan" style={{ fontSize: '0.68rem' }}>EVM Verified</span>
               </div>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Verify any on-chain receipt: Transaction ID (<code>0x82A7...</code>), Block (<code>#893721</code>), Status (Confirmed), and direct Etherscan link.
+                Verify any on-chain receipt: Transaction ID, Block number, cryptographic status, and direct Etherscan link.
               </p>
             </div>
             <button
               className="btn btn-primary"
               onClick={() => {
-                setSelectedTxHash('0x82A7b913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011');
+                setSelectedTxHash(logs[0]?.txHash || '');
                 setIsTxDetailsOpen(true);
               }}
               style={{ fontSize: '0.85rem', padding: '0.5rem 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               <Search size={14} />
-              <span>⛓️ Verify Transaction (0x82A7...)</span>
+              <span>⛓️ Verify Ledger Details</span>
             </button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {logs.map((log) => (
+            {logs.length === 0 ? (
               <div
-                key={log.txHash}
                 style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  padding: '1rem',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px dashed rgba(255, 255, 255, 0.12)',
                   borderRadius: 'var(--radius-sm)',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  padding: '3rem 2rem',
+                  textAlign: 'center',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>
-                      Block #{log.blockNumber}
-                    </span>
-                    {log.event === 'FileRegistered' && (
-                      <span className="badge badge-cyan" style={{ fontSize: '0.72rem' }}>
-                        📤 Uploaded
-                      </span>
-                    )}
-                    {log.event === 'AccessGranted' && (
-                      <span className="badge badge-emerald" style={{ fontSize: '0.72rem' }}>
-                        🤝 Shared
-                      </span>
-                    )}
-                    {log.event === 'DownloadRecorded' && (
-                      <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>
-                        📥 Accessed / Downloaded
-                      </span>
-                    )}
-                    {log.event === 'AccessRevoked' && (
-                      <span className="badge btn-danger" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}>
-                        🚫 Revoked
-                      </span>
-                    )}
-                    {!['FileRegistered', 'AccessGranted', 'DownloadRecorded', 'AccessRevoked'].includes(log.event) && (
-                      <span className="badge badge-cyan" style={{ fontSize: '0.72rem' }}>
-                        {log.event}
-                      </span>
-                    )}
-                  </div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {new Date(log.timestamp).toLocaleTimeString()} &bull; {new Date(log.timestamp).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: '0.25rem 0' }}>
-                  {log.details}
+                <Clock size={36} color="var(--accent-cyan)" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                <h4 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>No Blockchain Transactions Yet</h4>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '420px', margin: '0 auto' }}>
+                  Transactions will appear here as soon as you upload files, grant access, or download encrypted files.
                 </p>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    <span>Tx Hash:</span>
-                    <code className="mono" style={{ color: 'var(--accent-cyan)' }}>
-                      {truncate(log.txHash)}
-                    </code>
+              </div>
+            ) : (
+              logs.map((log) => (
+                <div
+                  key={log.txHash}
+                  style={{
+                    background: 'rgba(0,0,0,0.35)',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>
+                        Block #{log.blockNumber}
+                      </span>
+                      {log.event === 'FileRegistered' && (
+                        <span className="badge badge-cyan" style={{ fontSize: '0.72rem' }}>
+                          📤 Uploaded
+                        </span>
+                      )}
+                      {log.event === 'AccessGranted' && (
+                        <span className="badge badge-emerald" style={{ fontSize: '0.72rem' }}>
+                          🤝 Shared
+                        </span>
+                      )}
+                      {log.event === 'DownloadRecorded' && (
+                        <span className="badge badge-purple" style={{ fontSize: '0.72rem' }}>
+                          📥 Accessed / Downloaded
+                        </span>
+                      )}
+                      {log.event === 'AccessRevoked' && (
+                        <span className="badge btn-danger" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}>
+                          🚫 Revoked
+                        </span>
+                      )}
+                      {!['FileRegistered', 'AccessGranted', 'DownloadRecorded', 'AccessRevoked'].includes(log.event) && (
+                        <span className="badge badge-cyan" style={{ fontSize: '0.72rem' }}>
+                          {log.event}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {new Date(log.timestamp).toLocaleTimeString()} &bull; {new Date(log.timestamp).toLocaleDateString()}
+                    </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => {
-                        setSelectedTxHash(log.txHash);
-                        setIsTxDetailsOpen(true);
-                      }}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      <Search size={12} />
-                      <span>⛓️ Verify Details</span>
-                    </button>
-                    <a
-                      href={`https://sepolia.etherscan.io/tx/${log.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'var(--accent-cyan)' }}
-                    >
-                      <span>View on Explorer</span>
-                      <ExternalLink size={12} />
-                    </a>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: '0.25rem 0' }}>
+                    {log.details}
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      <span>Tx Hash:</span>
+                      <code className="mono" style={{ color: 'var(--accent-cyan)' }}>
+                        {truncate(log.txHash)}
+                      </code>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => {
+                          setSelectedTxHash(log.txHash);
+                          setIsTxDetailsOpen(true);
+                        }}
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Search size={12} />
+                        <span>⛓️ Verify Details</span>
+                      </button>
+                      <a
+                        href={`https://sepolia.etherscan.io/tx/${log.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', color: 'var(--accent-cyan)' }}
+                      >
+                        <span>View on Explorer</span>
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}

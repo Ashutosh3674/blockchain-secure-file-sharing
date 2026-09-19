@@ -246,7 +246,6 @@ export function App() {
       {/* Blockchain Transaction Details & Verification Modal */}
       <TransactionDetailsModal
         isOpen={txDetailsModalOpen}
-        initialTxHash="0x82A7b913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011"
         onClose={() => setTxDetailsModalOpen(false)}
         onShowToast={showToast}
       />

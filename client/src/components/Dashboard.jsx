@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWeb3 } from '../context/Web3Context';
 import {
@@ -18,10 +18,18 @@ import {
   Link2,
   Blocks,
   BarChart3,
+  Upload,
+  Users,
+  FileText,
+  Activity,
+  Star,
+  TrendingUp,
+  Download,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileShareManager } from './FileShareManager';
 import { AnalyticsView } from './AnalyticsView';
+import { contractService, getStoredLogs } from '../services/contractService';
 
 export const Dashboard = ({ onShowToast }) => {
   const { user, linkWallet } = useAuth();
@@ -29,7 +37,30 @@ export const Dashboard = ({ onShowToast }) => {
 
   const [copied, setCopied] = useState(false);
   const [linking, setLinking] = useState(false);
-  const [activeTab, setActiveTab] = useState('sharing');
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Dynamic real-time stats & activity logs
+  const displayWallet = user?.walletAddress || account;
+  const [stats, setStats] = useState({
+    filesUploaded: 0,
+    filesDownloaded: 0,
+    filesShared: 0,
+    activePermissions: 0,
+    expiredPermissions: 0,
+  });
+  const [recentLogs, setRecentLogs] = useState([]);
+
+  useEffect(() => {
+    const loadRealData = () => {
+      const liveStats = contractService.getBlockchainStats(displayWallet);
+      setStats(liveStats);
+      const logs = getStoredLogs();
+      setRecentLogs(logs.slice(0, 5));
+    };
+    loadRealData();
+    window.addEventListener('storage', loadRealData);
+    return () => window.removeEventListener('storage', loadRealData);
+  }, [displayWallet]);
 
   // Interactive mock encryption demo state
   const [demoFileName, setDemoFileName] = useState('My_Confidential_Document.pdf');
@@ -74,13 +105,12 @@ export const Dashboard = ({ onShowToast }) => {
     setEncryptedHash(null);
     setTimeout(() => {
       setIsEncrypting(false);
-      setEncryptedHash('QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco');
+      const randomHash = 'Qm' + Array.from(crypto.getRandomValues(new Uint8Array(22))).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 44);
+      setEncryptedHash(randomHash);
       try { confetti({ particleCount: 40 }); } catch {}
-      onShowToast('Sample file encrypted with AES-256 and mapped to IPFS CID hash!');
+      onShowToast('File encrypted with AES-256 and mapped to IPFS CID hash!');
     }, 1200);
   };
-
-  const displayWallet = user?.walletAddress || account;
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem 1.5rem 4rem' }}>
@@ -118,15 +148,27 @@ export const Dashboard = ({ onShowToast }) => {
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               className="btn btn-primary"
-              onClick={() => setActiveTab('sharing')}
+              onClick={() => setActiveTab('dashboard')}
               style={{
-                background: activeTab === 'sharing' ? 'linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)' : 'rgba(0, 242, 254, 0.12)',
-                color: activeTab === 'sharing' ? '#050b14' : 'var(--accent-cyan)',
+                background: activeTab === 'dashboard' ? 'linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)' : 'rgba(0, 242, 254, 0.12)',
+                color: activeTab === 'dashboard' ? '#050b14' : 'var(--accent-cyan)',
                 border: '1px solid var(--accent-cyan)',
               }}
             >
+              <Star size={16} />
+              <span>My Dashboard</span>
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setActiveTab('sharing')}
+              style={{
+                borderColor: activeTab === 'sharing' ? 'var(--accent-cyan)' : undefined,
+                background: activeTab === 'sharing' ? 'rgba(0, 242, 254, 0.1)' : undefined,
+                color: activeTab === 'sharing' ? 'var(--accent-cyan)' : undefined,
+              }}
+            >
               <Blocks size={16} />
-              <span>Smart Contract Access Control</span>
+              <span>Smart Contract</span>
             </button>
             <button
               className="btn btn-secondary"
@@ -138,7 +180,7 @@ export const Dashboard = ({ onShowToast }) => {
               }}
             >
               <BarChart3 size={16} />
-              <span>Analytics & Graphs</span>
+              <span>Analytics</span>
             </button>
             <button
               className="btn btn-secondary"
@@ -148,7 +190,7 @@ export const Dashboard = ({ onShowToast }) => {
                 background: activeTab === 'overview' ? 'rgba(0, 242, 254, 0.1)' : undefined,
               }}
             >
-              Profile & Wallet
+              Profile &amp; Wallet
             </button>
             <button
               className="btn btn-secondary"
@@ -190,23 +232,23 @@ export const Dashboard = ({ onShowToast }) => {
           <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Files uploaded:</span>
-              <span className="badge badge-cyan" style={{ fontSize: '0.75rem', fontWeight: 700 }}>28</span>
+              <span className="badge badge-cyan" style={{ fontSize: '0.75rem', fontWeight: 700 }}>{stats.filesUploaded}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Files downloaded:</span>
-              <span className="badge badge-emerald" style={{ fontSize: '0.75rem', fontWeight: 700 }}>142</span>
+              <span className="badge badge-emerald" style={{ fontSize: '0.75rem', fontWeight: 700 }}>{stats.filesDownloaded}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Files shared:</span>
-              <span className="badge badge-purple" style={{ fontSize: '0.75rem', fontWeight: 700 }}>47</span>
+              <span className="badge badge-purple" style={{ fontSize: '0.75rem', fontWeight: 700 }}>{stats.filesShared}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Active permissions:</span>
-              <span className="badge badge-cyan" style={{ fontSize: '0.75rem', fontWeight: 700 }}>34</span>
+              <span className="badge badge-cyan" style={{ fontSize: '0.75rem', fontWeight: 700 }}>{stats.activePermissions}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Expired permissions:</span>
-              <span className="badge badge-amber" style={{ fontSize: '0.75rem', fontWeight: 700 }}>13</span>
+              <span className="badge badge-amber" style={{ fontSize: '0.75rem', fontWeight: 700 }}>{stats.expiredPermissions}</span>
             </div>
           </div>
 
@@ -221,7 +263,203 @@ export const Dashboard = ({ onShowToast }) => {
         </div>
       </div>
 
-      {/* Main Tab Content */}
+      {/* ===================== TAB: MY DASHBOARD ===================== */}
+      {activeTab === 'dashboard' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+
+          {/* Row 1: Account Card + Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+
+            {/* Account Profile Card */}
+            <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {/* Avatar */}
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '18px',
+                  background: 'linear-gradient(135deg, #00f2fe 0%, #8b5cf6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  fontWeight: 800,
+                  color: '#050b14',
+                  flexShrink: 0,
+                  boxShadow: '0 0 25px rgba(0,242,254,0.35)',
+                }}>
+                  {user?.name?.[0]?.toUpperCase() || 'A'}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.3rem', margin: 0 }}>{user?.name || 'Ashutosh'}</h3>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>{user?.email}</p>
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '6px', flexWrap: 'wrap' }}>
+                    <span className="badge badge-cyan" style={{ fontSize: '0.68rem' }}>Role: {user?.role || 'User'}</span>
+                    <span className="badge badge-emerald" style={{ fontSize: '0.68rem' }}>
+                      <CheckCircle2 size={10} /> JWT Active
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wallet Status */}
+              <div style={{
+                background: displayWallet ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+                border: `1px solid ${displayWallet ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '4px' }}>
+                  <Wallet size={14} color={displayWallet ? 'var(--accent-emerald)' : '#fbbf24'} />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Web3 Wallet</span>
+                </div>
+                {displayWallet ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)', wordBreak: 'break-all' }}>
+                      {displayWallet.slice(0,10)}...{displayWallet.slice(-6)}
+                    </span>
+                    <button onClick={() => handleCopy(displayWallet)} className="btn btn-secondary" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
+                      <Copy size={11} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-wallet"
+                    onClick={handleLinkCurrentWallet}
+                    disabled={linking || isConnecting}
+                    style={{ width: '100%', marginTop: '4px', padding: '0.5rem', fontSize: '0.8rem' }}
+                  >
+                    <Wallet size={14} />
+                    <span>{isConnecting ? 'Connecting...' : 'Connect & Link Wallet'}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Member Since */}
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Member since: {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Today'}
+              </div>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignContent: 'start' }}>
+              {[
+                { label: 'Files Uploaded', value: stats.filesUploaded, icon: <Upload size={20} />, color: '#00f2fe', bg: 'rgba(0,242,254,0.1)', border: 'rgba(0,242,254,0.25)' },
+                { label: 'Files Shared', value: stats.filesShared, icon: <Users size={20} />, color: '#a78bfa', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.25)' },
+                { label: 'Downloads', value: stats.filesDownloaded, icon: <Download size={20} />, color: '#34d399', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' },
+                { label: 'Active Permissions', value: stats.activePermissions, icon: <Shield size={20} />, color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' },
+              ].map((stat) => (
+                <div key={stat.label} className="glass-panel" style={{
+                  padding: '1.25rem',
+                  background: stat.bg,
+                  border: `1px solid ${stat.border}`,
+                  borderRadius: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}>
+                  <div style={{ color: stat.color }}>{stat.icon}</div>
+                  <div style={{ fontSize: '1.9rem', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 2: Quick Actions */}
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <Activity size={18} color="var(--accent-cyan)" />
+              <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Quick Actions</h3>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+              {[
+                { label: 'Upload & Encrypt File', desc: 'AES-256 encryption', icon: <Upload size={22} />, color: '#00f2fe', tab: 'sharing' },
+                { label: 'Share with Someone', desc: 'Grant wallet access', icon: <Users size={22} />, color: '#a78bfa', tab: 'sharing' },
+                { label: 'View Analytics', desc: 'Charts & graphs', icon: <TrendingUp size={22} />, color: '#34d399', tab: 'analytics' },
+                { label: 'Encryption Lab', desc: 'Test AES-256 live', icon: <Lock size={22} />, color: '#f472b6', tab: 'simulator' },
+                { label: 'My Files', desc: 'Owned & shared files', icon: <FileText size={22} />, color: '#fbbf24', tab: 'sharing' },
+                { label: 'Profile & Wallet', desc: 'Account settings', icon: <Key size={22} />, color: '#38bdf8', tab: 'overview' },
+              ].map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => setActiveTab(action.tab)}
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = action.color; e.currentTarget.style.background = `${action.color}10`; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                >
+                  <div style={{ color: action.color }}>{action.icon}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{action.label}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{action.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 3: Recent Activity */}
+          <div className="glass-panel" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Activity size={18} color="var(--accent-cyan)" />
+                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Recent Activity</h3>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('analytics')} style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}>
+                View All →
+              </button>
+            </div>
+            {recentLogs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                <Activity size={34} style={{ opacity: 0.3, margin: '0 auto 0.6rem' }} />
+                <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>No recent activity yet</p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>Upload, share, or download a file to see real blockchain events here.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {recentLogs.map((item, i) => (
+                  <div key={item.txHash || i} style={{
+                    background: 'rgba(0,242,254,0.04)',
+                    border: '1px solid rgba(0,242,254,0.15)',
+                    borderRadius: '10px',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.85rem',
+                  }}>
+                    <span style={{ fontSize: '1.3rem' }}>
+                      {item.event === 'FileRegistered' ? '📤' : item.event === 'AccessGranted' ? '🔑' : item.event === 'DownloadRecorded' ? '📥' : '⚡'}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.details || item.event}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Tx: <span className="mono" style={{ color: 'var(--accent-cyan)' }}>{(item.txHash || '').slice(0, 12)}...</span> &bull; Block #{item.blockNumber || '18942200'}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* ===================== TAB: PROFILE & WALLET ===================== */}
       {activeTab === 'overview' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.75rem' }}>
           

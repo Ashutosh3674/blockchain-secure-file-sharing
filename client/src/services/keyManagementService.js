@@ -10,26 +10,6 @@ import { bufferToBase64, base64ToBuffer } from './cryptoService';
 
 const KEY_STORAGE_PREFIX = 'blockshare_rsa_keys_';
 
-// Pre-seeded Demo Public & Private Keys for Ashutosh, Rahul, and Stranger
-// Generated with standard RSA-OAEP (2048 bits, SHA-256)
-const DEMO_KEYS = {
-  // Ashutosh (Owner)
-  '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-    name: 'Ashutosh',
-    publicKeySpki: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx4qV9z2mK8...ASHUTOSH_PUBKEY',
-  },
-  // Rahul (Recipient)
-  '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': {
-    name: 'Rahul',
-    publicKeySpki: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu7mK1z9pL2...RAHUL_PUBKEY',
-  },
-  // Stranger (Unauthorized)
-  '0x90f79bf6eb2c4f870365e785982e1f101e93b906': {
-    name: 'Stranger',
-    publicKeySpki: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw8qL3z0oM5...STRANGER_PUBKEY',
-  },
-};
-
 export const keyManagementService = {
   /**
    * Generates or retrieves an RSA-OAEP (2048-bit) key pair for a given EVM wallet address.

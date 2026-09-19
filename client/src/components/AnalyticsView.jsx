@@ -21,27 +21,11 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { contractService } from '../services/contractService';
+
 /**
  * 📊 AnalyticsView.jsx
  * Comprehensive Real-time Analytics & Dashboard Visualizations
- *
- * Requirements:
- * 1. Dashboard graphs:
- *    Files Uploaded
- *          |
- *      100 |        █
- *       80 |      █ █
- *       60 |    █ █ █
- *       40 |  █ █ █ █
- *       20 |█ █ █ █ █
- *          ----------------
- *           Mon Tue Wed Thu
- * 2. Statistics:
- *    - Files uploaded
- *    - Files downloaded
- *    - Files shared
- *    - Active permissions
- *    - Expired permissions
  */
 export const AnalyticsView = ({ onShowToast }) => {
   const [timeframe, setTimeframe] = useState('7d'); // '7d' | '30d' | 'all'
@@ -49,45 +33,54 @@ export const AnalyticsView = ({ onShowToast }) => {
   const [loading, setLoading] = useState(false);
   const [hoveredBar, setHoveredBar] = useState(null);
 
-  // Statistics & Graph state
+  // Statistics & Graph state - initialized to real live state
   const [stats, setStats] = useState({
-    filesUploaded: 28,
-    filesDownloaded: 142,
-    filesShared: 47,
-    activePermissions: 34,
-    expiredPermissions: 13,
-    totalPermissions: 47,
-    activePercentage: 72,
+    filesUploaded: 0,
+    filesDownloaded: 0,
+    filesShared: 0,
+    activePermissions: 0,
+    expiredPermissions: 0,
+    totalPermissions: 0,
+    activePercentage: 0,
   });
 
   const [graphData, setGraphData] = useState([
-    { day: 'Mon', count: 20, heightPercent: 20, label: 'Monday: 20 files' },
-    { day: 'Tue', count: 40, heightPercent: 40, label: 'Tuesday: 40 files' },
-    { day: 'Wed', count: 60, heightPercent: 60, label: 'Wednesday: 60 files' },
-    { day: 'Thu', count: 80, heightPercent: 80, label: 'Thursday: 80 files' },
-    { day: 'Fri', count: 100, heightPercent: 100, label: 'Friday: 100 files' },
-    { day: 'Sat', count: 45, heightPercent: 45, label: 'Saturday: 45 files' },
-    { day: 'Sun', count: 70, heightPercent: 70, label: 'Sunday: 70 files' },
+    { day: 'Mon', count: 0, heightPercent: 0, label: 'Monday: 0 files' },
+    { day: 'Tue', count: 0, heightPercent: 0, label: 'Tuesday: 0 files' },
+    { day: 'Wed', count: 0, heightPercent: 0, label: 'Wednesday: 0 files' },
+    { day: 'Thu', count: 0, heightPercent: 0, label: 'Thursday: 0 files' },
+    { day: 'Fri', count: 0, heightPercent: 0, label: 'Friday: 0 files' },
+    { day: 'Sat', count: 0, heightPercent: 0, label: 'Saturday: 0 files' },
+    { day: 'Sun', count: 0, heightPercent: 0, label: 'Sunday: 0 files' },
   ]);
 
   const [downloadsVsShares, setDownloadsVsShares] = useState([
-    { day: 'Mon', downloads: 35, shares: 12 },
-    { day: 'Tue', downloads: 65, shares: 24 },
-    { day: 'Wed', downloads: 110, shares: 38 },
-    { day: 'Thu', downloads: 140, shares: 52 },
-    { day: 'Fri', downloads: 175, shares: 68 },
-    { day: 'Sat', downloads: 90, shares: 30 },
-    { day: 'Sun', downloads: 120, shares: 44 },
+    { day: 'Mon', downloads: 0, shares: 0 },
+    { day: 'Tue', downloads: 0, shares: 0 },
+    { day: 'Wed', downloads: 0, shares: 0 },
+    { day: 'Thu', downloads: 0, shares: 0 },
+    { day: 'Fri', downloads: 0, shares: 0 },
+    { day: 'Sat', downloads: 0, shares: 0 },
+    { day: 'Sun', downloads: 0, shares: 0 },
   ]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
+      const liveLocal = contractService.getBlockchainStats();
+      if (liveLocal) {
+        setStats(liveLocal);
+      }
+
       const res = await fetch('/api/files/analytics');
       if (res.ok) {
         const data = await res.json();
         if (data.statistics) {
-          setStats(data.statistics);
+          setStats((prev) => ({
+            ...prev,
+            ...data.statistics,
+            filesUploaded: Math.max(prev.filesUploaded, data.statistics.filesUploaded || 0),
+          }));
         }
         if (data.graphs?.dailyUploads) {
           setGraphData(data.graphs.dailyUploads);

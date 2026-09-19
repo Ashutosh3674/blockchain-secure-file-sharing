@@ -20,126 +20,16 @@ export const FILE_ACCESS_CONTROL_ABI = [
 ];
 
 // In-Memory & LocalStorage Persistent Blockchain State
-const STORAGE_KEY_FILES = 'blockshare_chain_files_v4';
-const STORAGE_KEY_LOGS = 'blockshare_chain_logs_v2';
+const STORAGE_KEY_FILES = 'blockshare_chain_files_v5';
+const STORAGE_KEY_LOGS = 'blockshare_chain_logs_v3';
 
 export const getPersonaNameByAddress = (address) => {
   if (!address) return 'Unknown';
   const clean = address.toLowerCase();
-  if (clean === '0x71c67ed3e80435a55611f476c66337051b7b292a') return 'Ashutosh';
-  if (clean === '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc') return 'Rahul';
-  if (clean === '0x90f79bf6eb2c4f870365e785982e1f101e93b906') return 'Amit';
-  if (clean === '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65') return 'Priya';
   return clean.slice(0, 6) + '...' + clean.slice(-4);
 };
 
-const INITIAL_FILES = [
-  {
-    shareId: '8f72d9e2',
-    ipfsHash: 'QmReport78xK29vnemtYgPpHdWEz79ojWnPbdG12345678',
-    fileName: 'Report.pdf',
-    fileType: 'application/pdf',
-    fileSize: 1850000,
-    isPublic: false, // Default: Private Sharing (Only Rahul)
-    sha256Hash: 'a8f92b71d9e2304c8f5a6b7e1290384756102938475610293847561029384756',
-    owner: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc', // Rahul
-    ownerName: 'Rahul',
-    uploadedAt: Date.now() - 3600000 * 5,
-    authorizedRecipients: [
-      '0x71c67ed3e80435a55611f476c66337051b7b292a', // Ashutosh
-    ],
-    permissions: {
-      '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-20T12:00:00Z').getTime(), // 20 Sept
-        maxDownloads: 5,
-        downloadCount: 1,
-      },
-    },
-  },
-  {
-    shareId: '3b92f810',
-    ipfsHash: 'QmNotes45aB91vnemtYgPpHdWEz79ojWnPbdG87654321',
-    fileName: 'Notes.pdf',
-    fileType: 'application/pdf',
-    fileSize: 940000,
-    isPublic: false, // Default: Private Sharing
-    sha256Hash: '3b92f8102938475610293847561029384756a8f92b71d9e2304c8f5a6b7e1290',
-    owner: '0x90f79bf6eb2c4f870365e785982e1f101e93b906', // Amit
-    ownerName: 'Amit',
-    uploadedAt: Date.now() - 3600000 * 8,
-    authorizedRecipients: [
-      '0x71c67ed3e80435a55611f476c66337051b7b292a', // Ashutosh
-    ],
-    permissions: {
-      '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-25T12:00:00Z').getTime(), // 25 Sept
-        maxDownloads: 3,
-        downloadCount: 0,
-      },
-    },
-  },
-  {
-    shareId: '7c8d9e0f',
-    ipfsHash: 'QmProjectZip99xnemtYgPpHdWEz79ojWnPbdG99887766',
-    fileName: 'Project.zip',
-    fileType: 'application/zip',
-    fileSize: 5600000,
-    isPublic: false, // Default: Private Sharing
-    sha256Hash: '7c8d9e0f2a4b6c8d0e2f4a6b8c0d2ea8f92b71d9e2304c8f5a6b7e1290384756',
-    owner: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65', // Priya
-    ownerName: 'Priya',
-    uploadedAt: Date.now() - 3600000 * 12,
-    authorizedRecipients: [
-      '0x71c67ed3e80435a55611f476c66337051b7b292a', // Ashutosh
-    ],
-    permissions: {
-      '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-30T12:00:00Z').getTime(), // 30 Sept
-        maxDownloads: 10,
-        downloadCount: 0,
-      },
-    },
-  },
-  {
-    shareId: 'a8f92b71',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    fileName: 'Project_Alpha_Blueprint.pdf',
-    fileType: 'application/pdf',
-    fileSize: 2458000,
-    isPublic: false, // Default: Private Sharing
-    sha256Hash: 'a8f92b71d9e2304c8f5a6b7e1290384756102938475610293847561029384756',
-    owner: '0x71c67ed3e80435a55611f476c66337051b7b292a', // Ashutosh
-    ownerName: 'Ashutosh',
-    uploadedAt: Date.now() - 3600000 * 4,
-    authorizedRecipients: [
-      '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc', // Rahul
-    ],
-    permissions: {
-      '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-20T12:00:00Z').getTime(),
-        maxDownloads: 3,
-        downloadCount: 1,
-      },
-    },
-  },
-  {
-    shareId: '7c3a819b',
-    ipfsHash: 'QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco',
-    fileName: 'Annual_Financial_Audit_2026.xlsx',
-    fileType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    fileSize: 1124000,
-    isPublic: false, // Default: Private Sharing
-    sha256Hash: '7c3a819b5d2f4019a8e72c5b0d4f3e1a6b9c8d7e0f2a4b6c8d0e2f4a6b8c0d2e',
-    owner: '0x71c67ed3e80435a55611f476c66337051b7b292a', // Ashutosh
-    ownerName: 'Ashutosh',
-    uploadedAt: Date.now() - 3600000 * 24,
-    authorizedRecipients: [],
-  },
-];
+const INITIAL_FILES = [];
 
 export const getFileByShareId = (shareId) => {
   if (!shareId) return null;
@@ -155,45 +45,12 @@ export const getFileByShareId = (shareId) => {
   );
 };
 
-const INITIAL_LOGS = [
-  {
-    txHash: '0x8f2b4c7913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011',
-    blockNumber: 18942150,
-    event: 'FileRegistered',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    details: 'Ashutosh uploaded Project_Alpha_Blueprint.pdf (SHA-256 Checksum: a8f92b71...)',
-    timestamp: Date.now() - 3600000 * 3,
-  },
-  {
-    txHash: '0x3a7e912f68bc1d459021da637e1b5902847cbb9281a4b92138a0112487cbb928',
-    blockNumber: 18942180,
-    event: 'AccessGranted',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    details: 'Ashutosh shared Project_Alpha_Blueprint.pdf with Rahul (0x3C44...93BC)',
-    timestamp: Date.now() - 3600000 * 2,
-  },
-  {
-    txHash: '0x5c8e219fa82bca470183ec9482bca84192bfa71029487cbb9281a4b92138a044',
-    blockNumber: 18942220,
-    event: 'DownloadRecorded',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    details: 'Rahul accessed and downloaded Project_Alpha_Blueprint.pdf (Decrypted in browser)',
-    timestamp: Date.now() - 3600000 * 1,
-  },
-  {
-    txHash: '0x9d4e1f7a82bca84192bfa71029487cbb9281a4b92138a0110183ec9482bca855',
-    blockNumber: 18942260,
-    event: 'AccessRevoked',
-    ipfsHash: 'QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco',
-    details: "Ashutosh revoked Rahul's access for file Annual_Financial_Audit_2026.xlsx",
-    timestamp: Date.now() - 1800000,
-  },
-];
+const INITIAL_LOGS = [];
 
 export const getStoredFiles = () => {
   try {
     const data = localStorage.getItem(STORAGE_KEY_FILES);
-    const files = data ? JSON.parse(data) : INITIAL_FILES;
+    const files = data ? JSON.parse(data) : [];
     let updated = false;
     files.forEach((f) => {
       if (!f.shareId) {
@@ -206,7 +63,7 @@ export const getStoredFiles = () => {
     }
     return files;
   } catch {
-    return INITIAL_FILES;
+    return [];
   }
 };
 
@@ -217,14 +74,71 @@ export const saveStoredFiles = (files) => {
 export const getStoredLogs = () => {
   try {
     const data = localStorage.getItem(STORAGE_KEY_LOGS);
-    return data ? JSON.parse(data) : INITIAL_LOGS;
+    return data ? JSON.parse(data) : [];
   } catch {
-    return INITIAL_LOGS;
+    return [];
   }
 };
 
 export const saveStoredLogs = (logs) => {
   localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+};
+
+export const getBlockchainStats = (userAddress) => {
+  const files = getStoredFiles();
+  const logs = getStoredLogs();
+
+  let filesUploaded = 0;
+  let filesDownloaded = 0;
+  let filesShared = 0;
+  let activePermissions = 0;
+  let expiredPermissions = 0;
+
+  const cleanUser = (userAddress || '').toLowerCase();
+
+  files.forEach((f) => {
+    const isOwner = cleanUser && f.owner && f.owner.toLowerCase() === cleanUser;
+    if (!cleanUser || isOwner) {
+      filesUploaded++;
+    }
+
+    if (f.authorizedRecipients && f.authorizedRecipients.length > 0) {
+      if (!cleanUser || isOwner) {
+        filesShared += f.authorizedRecipients.length;
+      }
+    }
+
+    if (f.permissions) {
+      Object.values(f.permissions).forEach((p) => {
+        if (p.isAuthorized) {
+          const isExpired = p.expiresAt && p.expiresAt < Date.now();
+          if (isExpired) {
+            expiredPermissions++;
+          } else {
+            activePermissions++;
+          }
+        }
+        if (p.downloadCount) {
+          filesDownloaded += p.downloadCount;
+        }
+      });
+    }
+  });
+
+  return {
+    filesUploaded,
+    filesDownloaded,
+    filesShared,
+    activePermissions,
+    expiredPermissions,
+    totalPermissions: activePermissions + expiredPermissions,
+    activePercentage:
+      activePermissions + expiredPermissions > 0
+        ? Math.round((activePermissions / (activePermissions + expiredPermissions)) * 100)
+        : 0,
+    totalFiles: files.length,
+    totalLogs: logs.length,
+  };
 };
 
 const generateMockTxHash = () => {
@@ -1020,5 +934,7 @@ Status: ${accessStatus}`;
       file,
     };
   },
+
+  getBlockchainStats,
 };
 

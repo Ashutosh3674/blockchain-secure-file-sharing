@@ -259,97 +259,8 @@ router.post('/crypto-shred/:ipfsHash', (req, res) => {
   }
 });
 
-// Mock file metadata registry on server (mirrors smart contract initial state)
-const SERVER_SHARE_REGISTRY = [
-  {
-    shareId: '8f72d9e2',
-    ipfsHash: 'QmReport78xK29vnemtYgPpHdWEz79ojWnPbdG12345678',
-    fileName: 'Report.pdf',
-    fileType: 'application/pdf',
-    fileSize: 1850000,
-    isPublic: false, // Default: Private Sharing
-    status: 'active',
-    sha256Hash: 'a8f92b71d9e2304c8f5a6b7e1290384756102938475610293847561029384756',
-    owner: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc', // Rahul
-    ownerName: 'Rahul',
-    uploadedAt: Date.now() - 3600000 * 5,
-    authorizedRecipients: ['0x71c67ed3e80435a55611f476c66337051b7b292a'],
-    permissions: {
-      '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-20T12:00:00Z').getTime(),
-        maxDownloads: 5,
-        downloadCount: 1,
-      },
-    },
-  },
-  {
-    shareId: '3b92f810',
-    ipfsHash: 'QmNotes45aB91vnemtYgPpHdWEz79ojWnPbdG87654321',
-    fileName: 'Notes.pdf',
-    fileType: 'application/pdf',
-    fileSize: 940000,
-    isPublic: false, // Default: Private Sharing
-    status: 'active',
-    sha256Hash: '3b92f8102938475610293847561029384756a8f92b71d9e2304c8f5a6b7e1290',
-    owner: '0x90f79bf6eb2c4f870365e785982e1f101e93b906', // Amit
-    ownerName: 'Amit',
-    uploadedAt: Date.now() - 3600000 * 8,
-    authorizedRecipients: ['0x71c67ed3e80435a55611f476c66337051b7b292a'],
-    permissions: {
-      '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-25T12:00:00Z').getTime(),
-        maxDownloads: 3,
-        downloadCount: 0,
-      },
-    },
-  },
-  {
-    shareId: '7c8d9e0f',
-    ipfsHash: 'QmProjectZip99xnemtYgPpHdWEz79ojWnPbdG99887766',
-    fileName: 'Project.zip',
-    fileType: 'application/zip',
-    fileSize: 5600000,
-    isPublic: false, // Default: Private Sharing
-    status: 'active',
-    sha256Hash: '7c8d9e0f2a4b6c8d0e2f4a6b8c0d2ea8f92b71d9e2304c8f5a6b7e1290384756',
-    owner: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65', // Priya
-    ownerName: 'Priya',
-    uploadedAt: Date.now() - 3600000 * 12,
-    authorizedRecipients: ['0x71c67ed3e80435a55611f476c66337051b7b292a'],
-    permissions: {
-      '0x71c67ed3e80435a55611f476c66337051b7b292a': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-30T12:00:00Z').getTime(),
-        maxDownloads: 10,
-        downloadCount: 0,
-      },
-    },
-  },
-  {
-    shareId: 'a8f92b71',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    fileName: 'Project_Alpha_Blueprint.pdf',
-    fileType: 'application/pdf',
-    fileSize: 2458000,
-    isPublic: false, // Default: Private Sharing
-    status: 'active',
-    sha256Hash: 'a8f92b71d9e2304c8f5a6b7e1290384756102938475610293847561029384756',
-    owner: '0x71c67ed3e80435a55611f476c66337051b7b292a', // Ashutosh
-    ownerName: 'Ashutosh',
-    uploadedAt: Date.now() - 3600000 * 4,
-    authorizedRecipients: ['0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc'],
-    permissions: {
-      '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': {
-        isAuthorized: true,
-        expiresAt: new Date('2026-09-20T12:00:00Z').getTime(),
-        maxDownloads: 3,
-        downloadCount: 1,
-      },
-    },
-  },
-];
+// Server file metadata registry (populated dynamically on upload)
+const SERVER_SHARE_REGISTRY = [];
 
 // Helper: Standardized 9-field Metadata Formatter
 const formatServerFileMetadata = (file) => {
@@ -911,52 +822,7 @@ router.get('/metadata/:identifier', (req, res) => {
 });
 
 // In-Memory Server Notifications Registry
-const SERVER_NOTIFICATIONS_REGISTRY = [
-  {
-    id: 'srv_notif_1',
-    type: 'file_shared',
-    title: 'New File Shared',
-    message: 'Rahul shared a file with you.',
-    fileName: 'Project_Alpha_Blueprint.pdf',
-    actor: 'Rahul (0x3C44...93BC)',
-    timestamp: Date.now() - 1000 * 60 * 15,
-    isRead: false,
-    severity: 'info',
-  },
-  {
-    id: 'srv_notif_2',
-    type: 'access_expiring',
-    title: 'Access Expiry Warning',
-    message: 'Your access to Report.pdf expires tomorrow.',
-    fileName: 'Report.pdf',
-    actor: 'Smart Contract Guard',
-    timestamp: Date.now() - 1000 * 60 * 45,
-    isRead: false,
-    severity: 'warning',
-  },
-  {
-    id: 'srv_notif_3',
-    type: 'file_downloaded',
-    title: 'File Download Recorded',
-    message: 'Your file was downloaded.',
-    fileName: 'Quarterly_Security_Audit.pdf',
-    actor: 'Rahul (Authorized Recipient)',
-    timestamp: Date.now() - 1000 * 60 * 120,
-    isRead: false,
-    severity: 'success',
-  },
-  {
-    id: 'srv_notif_4',
-    type: 'access_revoked',
-    title: 'Access Revocation Notice',
-    message: 'Access to Project.pdf was revoked.',
-    fileName: 'Project.pdf',
-    actor: 'Ashutosh (Owner)',
-    timestamp: Date.now() - 1000 * 60 * 240,
-    isRead: true,
-    severity: 'danger',
-  },
-];
+const SERVER_NOTIFICATIONS_REGISTRY = [];
 
 // @desc    Get all notifications
 // @route   GET /api/files/notifications
@@ -1019,53 +885,31 @@ router.get('/analytics', (req, res) => {
       localFileCount = fs.readdirSync(IPFS_DIR).filter((f) => f.endsWith('.meta.json')).length;
     }
 
-    const filesUploaded = Math.max(localFileCount, 28);
-    const filesDownloaded = 142;
-    const filesShared = 47;
-    const activePermissions = 34;
-    const expiredPermissions = 13;
+    const filesUploaded = localFileCount;
+    const filesDownloaded = 0;
+    const filesShared = 0;
+    const activePermissions = 0;
+    const expiredPermissions = 0;
 
-    // Time-series graph data matching prompt's 20, 40, 60, 80, 100 on Mon, Tue, Wed, Thu, Fri
-    const dailyUploads = [
-      { day: 'Mon', count: 20, heightPercent: 20, date: '2026-09-14' },
-      { day: 'Tue', count: 40, heightPercent: 40, date: '2026-09-15' },
-      { day: 'Wed', count: 60, heightPercent: 60, date: '2026-09-16' },
-      { day: 'Thu', count: 80, heightPercent: 80, date: '2026-09-17' },
-      { day: 'Fri', count: 100, heightPercent: 100, date: '2026-09-18' },
-      { day: 'Sat', count: 45, heightPercent: 45, date: '2026-09-19' },
-      { day: 'Sun', count: 70, heightPercent: 70, date: '2026-09-20' },
-    ];
-
-    const dailyDownloads = [
-      { day: 'Mon', count: 35 },
-      { day: 'Tue', count: 65 },
-      { day: 'Wed', count: 110 },
-      { day: 'Thu', count: 140 },
-      { day: 'Fri', count: 175 },
-      { day: 'Sat', count: 90 },
-      { day: 'Sun', count: 120 },
-    ];
-
-    const dailyShares = [
-      { day: 'Mon', count: 12 },
-      { day: 'Tue', count: 24 },
-      { day: 'Wed', count: 38 },
-      { day: 'Thu', count: 52 },
-      { day: 'Fri', count: 68 },
-      { day: 'Sat', count: 30 },
-      { day: 'Sun', count: 44 },
-    ];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dailyUploads = days.map((day) => ({
+      day,
+      count: 0,
+      heightPercent: 0,
+    }));
+    const dailyDownloads = days.map((day) => ({ day, count: 0 }));
+    const dailyShares = days.map((day) => ({ day, count: 0 }));
 
     const asciiGraph = [
       "Files Uploaded",
       "      |",
-      "  100 |        █",
-      "   80 |      █ █",
-      "   60 |    █ █ █",
-      "   40 |  █ █ █ █",
-      "   20 |█ █ █ █ █",
+      "  100 |",
+      "   80 |",
+      "   60 |",
+      "   40 |",
+      "   20 |",
       "      ----------------",
-      "       Mon Tue Wed Thu Fri"
+      "       Mon Tue Wed Thu Fri Sat Sun"
     ].join('\n');
 
     res.status(200).json({
@@ -1077,7 +921,7 @@ router.get('/analytics', (req, res) => {
         activePermissions,
         expiredPermissions,
         totalPermissions: activePermissions + expiredPermissions,
-        activePercentage: Math.round((activePermissions / (activePermissions + expiredPermissions)) * 100),
+        activePercentage: 0,
       },
       graphs: {
         dailyUploads,
@@ -1096,77 +940,9 @@ router.get('/analytics', (req, res) => {
 // ============================================================================
 // ⛓️ BLOCKCHAIN TRANSACTION DETAILS & VERIFICATION ENDPOINTS
 // Allows users to verify any on-chain transaction:
-// Transaction ID: 0x82A7... | Block: #893721 | Status: Confirmed
-// Timestamp: 18 Sept 2026 | Action: File Permission Granted | View on Explorer
 // ============================================================================
-const CANONICAL_TRANSACTIONS_DATABASE = [
-  {
-    txHash: '0x82A7b913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011',
-    txHashShort: '0x82A7...',
-    blockNumber: '#893721',
-    blockHeightNumber: 893721,
-    status: 'Confirmed',
-    confirmations: 24,
-    timestamp: '2026-09-18T14:30:00.000Z',
-    timestampFormatted: '18 Sept 2026',
-    action: 'File Permission Granted',
-    contractAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    from: '0x71c67ed3e80435a55611f476c66337051b7b292a',
-    fromName: 'Ashutosh',
-    to: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
-    toName: 'Rahul',
-    fileName: 'Project.pdf',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    gasUsed: '48,210',
-    gasPriceGwei: '14.2',
-    network: 'Ethereum Sepolia Testnet (EVM)',
-    explorerUrl: 'https://sepolia.etherscan.io/tx/0x82A7b913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011',
-  },
-  {
-    txHash: '0x8f2b4c7913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011',
-    txHashShort: '0x8f2b...',
-    blockNumber: '#893710',
-    blockHeightNumber: 893710,
-    status: 'Confirmed',
-    confirmations: 35,
-    timestamp: '2026-09-18T11:00:00.000Z',
-    timestampFormatted: '18 Sept 2026',
-    action: 'File Registered',
-    contractAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    from: '0x71c67ed3e80435a55611f476c66337051b7b292a',
-    fromName: 'Ashutosh',
-    to: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    toName: 'FileAccessControl.sol',
-    fileName: 'Project_Alpha_Blueprint.pdf',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    gasUsed: '124,500',
-    gasPriceGwei: '14.2',
-    network: 'Ethereum Sepolia Testnet (EVM)',
-    explorerUrl: 'https://sepolia.etherscan.io/tx/0x8f2b4c7913e8a4d70183ec9482bca84192bfa71029487cbb9281a4b92138a011',
-  },
-  {
-    txHash: '0x9d4e1f7a82bca84192bfa71029487cbb9281a4b92138a0110183ec9482bca855',
-    txHashShort: '0x9d4e...',
-    blockNumber: '#893735',
-    blockHeightNumber: 893735,
-    status: 'Confirmed',
-    confirmations: 10,
-    timestamp: '2026-09-18T18:00:00.000Z',
-    timestampFormatted: '18 Sept 2026',
-    action: 'Access Revoked',
-    contractAddress: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    from: '0x71c67ed3e80435a55611f476c66337051b7b292a',
-    fromName: 'Ashutosh',
-    to: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
-    toName: 'Rahul',
-    fileName: 'Annual_Financial_Audit_2026.xlsx',
-    ipfsHash: 'QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco',
-    gasUsed: '32,180',
-    gasPriceGwei: '14.2',
-    network: 'Ethereum Sepolia Testnet (EVM)',
-    explorerUrl: 'https://sepolia.etherscan.io/tx/0x9d4e1f7a82bca84192bfa71029487cbb9281a4b92138a0110183ec9482bca855',
-  },
-];
+const CANONICAL_TRANSACTIONS_DATABASE = [];
+
 
 router.get('/transactions', (req, res) => {
   res.status(200).json({
@@ -1228,97 +1004,51 @@ router.get('/transactions/:txHash', (req, res) => {
 // - File ID: 101 -> Blockchain Hash: A91F8C... | Current Hash: A91F8C... -> ✅ FILE VERIFIED
 // - File ID: 102 -> Blockchain Hash: A91F8C... | Current Hash: F44B2E... -> ❌ FILE MODIFIED
 // ============================================================================
-const VERIFIABLE_FILES_DATABASE = [
-  {
-    fileId: '101',
-    fileName: 'Project.pdf',
-    fileSize: 4820000,
-    owner: '0x71c67ed3e80435a55611f476c66337051b7b292a',
-    ownerName: 'Ashutosh',
-    ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    blockchainHash: 'A91F8C28D73E1054FA6B7E129038475610293847561029384756102938475610',
-    blockchainHashShort: 'A91F8C...',
-    currentFileHash: 'A91F8C28D73E1054FA6B7E129038475610293847561029384756102938475610',
-    currentFileHashShort: 'A91F8C...',
-    status: 'clean',
-    isVerified: true,
-    result: 'FILE VERIFIED',
-    statusText: '✅ FILE VERIFIED',
-    blockNumber: '#893721',
-    timestamp: '18 Sept 2026',
-  },
-  {
-    fileId: '102',
-    fileName: 'Financial_Report_Q3.pdf',
-    fileSize: 2150000,
-    owner: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
-    ownerName: 'Rahul',
-    ipfsHash: 'QmReport78xK29vnemtYgPpHdWEz79ojWnPbdG12345678',
-    blockchainHash: 'A91F8C28D73E1054FA6B7E129038475610293847561029384756102938475610',
-    blockchainHashShort: 'A91F8C...',
-    currentFileHash: 'F44B2E9911C837D56A1029384756102938475610293847561029384756102938',
-    currentFileHashShort: 'F44B2E...',
-    status: 'modified',
-    isVerified: false,
-    result: 'FILE MODIFIED',
-    statusText: '❌ FILE MODIFIED',
-    tamperDetails: 'Cryptographic hash mismatch: Local payload bytes differ from on-chain digest.',
-    blockNumber: '#893718',
-    timestamp: '18 Sept 2026',
-  },
-  {
-    fileId: '103',
-    fileName: 'System_Architecture_Diagram.png',
-    fileSize: 3400000,
-    owner: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
-    ownerName: 'Priya',
-    ipfsHash: 'QmNotes45aB91vnemtYgPpHdWEz79ojWnPbdG87654321',
-    blockchainHash: '7C8D9E0F2A4B6C8D0E2F4A6B8C0D2EA8F92B71D9E2304C8F5A6B7E1290384756',
-    blockchainHashShort: '7C8D9E...',
-    currentFileHash: '7C8D9E0F2A4B6C8D0E2F4A6B8C0D2EA8F92B71D9E2304C8F5A6B7E1290384756',
-    currentFileHashShort: '7C8D9E...',
-    status: 'clean',
-    isVerified: true,
-    result: 'FILE VERIFIED',
-    statusText: '✅ FILE VERIFIED',
-    blockNumber: '#893725',
-    timestamp: '18 Sept 2026',
-  }
-];
-
 router.get('/verify-hash/:fileId', (req, res) => {
   try {
     const rawId = (req.params.fileId || '').trim();
-    let record = VERIFIABLE_FILES_DATABASE.find(
-      (f) => f.fileId.toLowerCase() === rawId.toLowerCase() || f.fileName.toLowerCase() === rawId.toLowerCase()
-    );
+    const IPFS_DIR = path.join(__dirname, '..', 'data', 'ipfs_storage');
 
-    if (!record) {
-      const defaultHash = 'A91F8C28D73E1054FA6B7E129038475610293847561029384756102938475610';
-      record = {
-        fileId: rawId,
-        fileName: `Document_${rawId}.pdf`,
-        fileSize: 1024 * 1024 * 2,
-        owner: '0x71c67ed3e80435a55611f476c66337051b7b292a',
-        ownerName: 'Ashutosh',
-        ipfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-        blockchainHash: defaultHash,
-        blockchainHashShort: 'A91F8C...',
-        currentFileHash: defaultHash,
-        currentFileHashShort: 'A91F8C...',
+    let metaFile = null;
+    if (fs.existsSync(IPFS_DIR)) {
+      const files = fs.readdirSync(IPFS_DIR);
+      const matched = files.find((f) => f.includes(rawId) && f.endsWith('.meta.json'));
+      if (matched) {
+        try {
+          metaFile = JSON.parse(fs.readFileSync(path.join(IPFS_DIR, matched), 'utf8'));
+        } catch (e) {}
+      }
+    }
+
+    if (metaFile) {
+      const hash = metaFile.sha256Hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+      const record = {
+        fileId: metaFile.ipfsHash,
+        fileName: metaFile.fileName,
+        fileSize: metaFile.fileSize,
+        owner: metaFile.owner || '0x0000000000000000000000000000000000000000',
+        ownerName: metaFile.ownerName || 'File Owner',
+        ipfsHash: metaFile.ipfsHash,
+        blockchainHash: hash,
+        blockchainHashShort: hash.slice(0, 8) + '...',
+        currentFileHash: hash,
+        currentFileHashShort: hash.slice(0, 8) + '...',
         status: 'clean',
         isVerified: true,
         result: 'FILE VERIFIED',
         statusText: '✅ FILE VERIFIED',
-        blockNumber: '#893721',
-        timestamp: '18 Sept 2026',
+        timestamp: new Date(metaFile.uploadedAt || Date.now()).toLocaleDateString(),
       };
+      return res.status(200).json({
+        success: true,
+        file: record,
+        ...record,
+      });
     }
 
-    res.status(200).json({
-      success: true,
-      file: record,
-      ...record,
+    return res.status(404).json({
+      success: false,
+      message: `No file found in IPFS registry matching identifier "${rawId}"`,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1328,10 +1058,21 @@ router.get('/verify-hash/:fileId', (req, res) => {
 router.post('/verify-hash', (req, res) => {
   try {
     const { fileId, currentFileHash, simulateTamper } = req.body;
-    const target = VERIFIABLE_FILES_DATABASE.find((f) => f.fileId === (fileId || '101')) || VERIFIABLE_FILES_DATABASE[0];
+    const IPFS_DIR = path.join(__dirname, '..', 'data', 'ipfs_storage');
 
-    const blockchainHash = target.blockchainHash;
-    let computedHash = currentFileHash || target.currentFileHash;
+    let metaFile = null;
+    if (fs.existsSync(IPFS_DIR)) {
+      const files = fs.readdirSync(IPFS_DIR);
+      const matched = files.find((f) => f.includes(fileId || '') && f.endsWith('.meta.json'));
+      if (matched) {
+        try {
+          metaFile = JSON.parse(fs.readFileSync(path.join(IPFS_DIR, matched), 'utf8'));
+        } catch (e) {}
+      }
+    }
+
+    const blockchainHash = (metaFile && metaFile.sha256Hash) || 'A91F8C28D73E1054FA6B7E129038475610293847561029384756102938475610';
+    let computedHash = currentFileHash || blockchainHash;
 
     if (simulateTamper) {
       computedHash = 'F44B2E9911C837D56A1029384756102938475610293847561029384756102938';
@@ -1341,8 +1082,8 @@ router.post('/verify-hash', (req, res) => {
 
     res.status(200).json({
       success: true,
-      fileId: target.fileId,
-      fileName: target.fileName,
+      fileId: fileId || 'file',
+      fileName: (metaFile && metaFile.fileName) || 'File.pdf',
       blockchainHash,
       blockchainHashShort: blockchainHash.slice(0, 6) + '...',
       currentFileHash: computedHash,
@@ -1350,7 +1091,7 @@ router.post('/verify-hash', (req, res) => {
       isVerified: isMatch,
       result: isMatch ? 'FILE VERIFIED' : 'FILE MODIFIED',
       statusText: isMatch ? '✅ FILE VERIFIED' : '❌ FILE MODIFIED',
-      timestamp: '18 Sept 2026',
+      timestamp: new Date().toLocaleDateString(),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

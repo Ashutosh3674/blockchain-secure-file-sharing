@@ -192,7 +192,7 @@ const FLOW_STEPS = [
     bgGradient: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(109,40,217,0.05) 100%)',
     description: 'The immutable, tamper-proof blockchain network (Sepolia/Ethereum). Mined transactions form an auditable consensus history that guarantees proof-of-ownership and access integrity globally.',
     tech: ['Ethereum Sepolia', 'Proof-of-Stake Consensus', 'Etherscan Explorer'],
-    telemetry: 'Tx: 0x82A7... Block: #893721 Status: Confirmed. Action: File Permission Granted. View on Explorer.',
+    telemetry: 'Consensus: Proof-of-Stake. State: Immutable. Verified on EVM Block Explorer.',
   },
 ];
 
@@ -711,7 +711,7 @@ export const SystemFlowModal = ({ isOpen, onClose, onShowToast }) => {
                     Step 9
                   </div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>Blockchain</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ethereum Sepolia &bull; Block #893721 &bull; Tx 0x82A7...</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ethereum Sepolia &bull; On-Chain Ledger</div>
                 </div>
               </div>
 

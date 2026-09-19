@@ -101,13 +101,13 @@ export const NotificationsDropdown = ({ onShowToast }) => {
   const triggerSimulatedNotif = (scenario) => {
     let notif;
     if (scenario === 1) {
-      notif = notificationService.notifyFileShared('Rahul', 'Project_Alpha_Blueprint.pdf');
+      notif = notificationService.notifyFileShared('Peer Wallet', 'Secure_Document.pdf');
     } else if (scenario === 2) {
-      notif = notificationService.notifyAccessExpiring('Report.pdf', 'tomorrow');
+      notif = notificationService.notifyAccessExpiring('Secure_Document.pdf', 'in 24 hours');
     } else if (scenario === 3) {
-      notif = notificationService.notifyFileDownloaded('Rahul', 'Quarterly_Security_Audit.pdf');
+      notif = notificationService.notifyFileDownloaded('Authorized Recipient', 'Secure_Document.pdf');
     } else if (scenario === 4) {
-      notif = notificationService.notifyAccessRevoked('Project.pdf', 'Ashutosh');
+      notif = notificationService.notifyAccessRevoked('Secure_Document.pdf', 'Owner');
     }
     if (onShowToast) onShowToast(`🔔 ${notif.message}`, 'info');
   };
@@ -330,7 +330,7 @@ export const NotificationsDropdown = ({ onShowToast }) => {
                 onClick={() => triggerSimulatedNotif(1)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.68rem', padding: '0.25rem 0.4rem', justifyContent: 'flex-start' }}
-                title="Rahul shared a file with you"
+                title="Simulate peer sharing a file"
               >
                 <span>🔔 File Shared</span>
               </button>
@@ -339,7 +339,7 @@ export const NotificationsDropdown = ({ onShowToast }) => {
                 onClick={() => triggerSimulatedNotif(2)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.68rem', padding: '0.25rem 0.4rem', justifyContent: 'flex-start' }}
-                title="Your access to Report.pdf expires tomorrow"
+                title="Simulate permission expiry warning"
               >
                 <span>⏰ Access Expiring</span>
               </button>
@@ -348,7 +348,7 @@ export const NotificationsDropdown = ({ onShowToast }) => {
                 onClick={() => triggerSimulatedNotif(3)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.68rem', padding: '0.25rem 0.4rem', justifyContent: 'flex-start' }}
-                title="Your file was downloaded"
+                title="Simulate download event"
               >
                 <span>📥 File Downloaded</span>
               </button>
@@ -357,7 +357,7 @@ export const NotificationsDropdown = ({ onShowToast }) => {
                 onClick={() => triggerSimulatedNotif(4)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.68rem', padding: '0.25rem 0.4rem', justifyContent: 'flex-start' }}
-                title="Access to Project.pdf was revoked"
+                title="Simulate access revocation"
               >
                 <span>🚫 Access Revoked</span>
               </button>

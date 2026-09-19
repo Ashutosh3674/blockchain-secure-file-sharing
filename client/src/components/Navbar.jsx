@@ -35,7 +35,7 @@ export const Navbar = ({
   const isAdmin = user?.role === 'admin' || user?.email?.includes('ashutosh') || true; // Demo admin access
 
   return (
-    <header className="glass-panel" style={{ margin: '1rem 1.5rem', padding: '0.85rem 1.75rem', borderRadius: '16px' }}>
+    <header className="glass-panel" style={{ margin: '1rem 1.5rem', padding: '0.85rem 1.75rem', borderRadius: '16px', position: 'sticky', top: '1rem', zIndex: 1000 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         
         {/* Brand */}
@@ -123,7 +123,7 @@ export const Navbar = ({
             type="button"
             className="btn btn-secondary"
             onClick={onOpenTxDetails}
-            title="Verify Blockchain Transactions (0x82A7... Block #893721)"
+            title="Verify Blockchain Ledger Transactions"
             style={{
               fontSize: '0.8rem',
               padding: '0.35rem 0.85rem',

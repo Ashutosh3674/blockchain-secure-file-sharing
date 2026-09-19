@@ -14,59 +14,10 @@
  * - Audible chimes and badge counter
  */
 
-const STORAGE_KEY_NOTIFICATIONS = 'blockshare_notifications_v1';
+const STORAGE_KEY_NOTIFICATIONS = 'blockshare_notifications_v2';
 
-// Initial pre-seeded notifications matching the user's requirements
-const SEED_NOTIFICATIONS = [
-  {
-    id: 'notif_1',
-    type: 'file_shared',
-    title: 'New File Shared',
-    message: 'Rahul shared a file with you.',
-    fileName: 'Project_Alpha_Blueprint.pdf',
-    actor: 'Rahul (0x3C44...93BC)',
-    timestamp: Date.now() - 1000 * 60 * 15, // 15 mins ago
-    isRead: false,
-    severity: 'info',
-    icon: 'Share2',
-  },
-  {
-    id: 'notif_2',
-    type: 'access_expiring',
-    title: 'Access Expiry Warning',
-    message: 'Your access to Report.pdf expires tomorrow.',
-    fileName: 'Report.pdf',
-    actor: 'Smart Contract Guard',
-    timestamp: Date.now() - 1000 * 60 * 45, // 45 mins ago
-    isRead: false,
-    severity: 'warning',
-    icon: 'Clock',
-  },
-  {
-    id: 'notif_3',
-    type: 'file_downloaded',
-    title: 'File Download Recorded',
-    message: 'Your file was downloaded.',
-    fileName: 'Quarterly_Security_Audit.pdf',
-    actor: 'Rahul (Authorized Recipient)',
-    timestamp: Date.now() - 1000 * 60 * 120, // 2 hours ago
-    isRead: false,
-    severity: 'success',
-    icon: 'Download',
-  },
-  {
-    id: 'notif_4',
-    type: 'access_revoked',
-    title: 'Access Revocation Notice',
-    message: 'Access to Project.pdf was revoked.',
-    fileName: 'Project.pdf',
-    actor: 'Ashutosh (Owner)',
-    timestamp: Date.now() - 1000 * 60 * 240, // 4 hours ago
-    isRead: true,
-    severity: 'danger',
-    icon: 'ShieldAlert',
-  },
-];
+// Clean initial notifications (no demo data)
+const SEED_NOTIFICATIONS = [];
 
 class NotificationService {
   constructor() {
@@ -77,12 +28,12 @@ class NotificationService {
     try {
       const data = localStorage.getItem(STORAGE_KEY_NOTIFICATIONS);
       if (!data) {
-        this.saveNotifications(SEED_NOTIFICATIONS);
-        return SEED_NOTIFICATIONS;
+        this.saveNotifications([]);
+        return [];
       }
       return JSON.parse(data);
     } catch {
-      return SEED_NOTIFICATIONS;
+      return [];
     }
   }
 
