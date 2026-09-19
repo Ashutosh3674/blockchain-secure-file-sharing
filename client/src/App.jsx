@@ -10,7 +10,7 @@ import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { TransactionDetailsModal } from './components/TransactionDetailsModal';
 import { FileVerificationPage } from './components/FileVerificationPage';
 import { Toast } from './components/Toast';
-import { Shield, Check, Lock, Database, Globe, Key } from 'lucide-react';
+import { Shield } from 'lucide-react';
 
 import { DevicePreviewBar } from './components/DevicePreviewBar';
 
@@ -226,23 +226,8 @@ export function App() {
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>BlockShare &bull; Secure File Sharing with Blockchain Architecture</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#34d399' }}>
-              <Lock size={13} />
-              bcrypt 12 Rounds
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#38bdf8' }}>
-              <Key size={13} />
-              JWT Auth (HS256 24h)
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#c084fc' }}>
-              <Globe size={13} />
-              HTTPS & HSTS
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#fb7185' }}>
-              <Shield size={13} />
-              Input Firewall & 50MB Limit
-            </span>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+            &copy; {new Date().getFullYear()} BlockShare. All rights reserved.
           </div>
         </div>
       </footer>
