@@ -75,8 +75,46 @@ const writeUsersToFile = (users) => {
   fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2), 'utf-8');
 };
 
-// Unified User model wrapper
+// Unified User model wrapper with dual-persistence (MongoDB + users.json mirror)
 const User = {
+  async syncToFile() {
+    try {
+      ensureDataFile();
+      if (isConnectedToMongo()) {
+        const mongoUsers = await MongooseUser.find({}).sort({ createdAt: -1 }).lean();
+        const formatted = mongoUsers.map((u) => ({
+          _id: u._id.toString(),
+          id: u._id.toString(),
+          name: u.name,
+          email: u.email,
+          walletAddress: u.walletAddress || null,
+          role: u.role || 'user',
+          status: 'active',
+          createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: u.updatedAt ? new Date(u.updatedAt).toISOString() : new Date().toISOString(),
+        }));
+        writeUsersToFile(formatted);
+      }
+    } catch (err) {
+      console.warn('⚠️ [User.syncToFile] Non-critical sync warning:', err.message);
+    }
+  },
+
+  async find(query = {}) {
+    if (isConnectedToMongo()) {
+      return await MongooseUser.find(query).select('-password').sort({ createdAt: -1 });
+    }
+    const users = readUsersFromFile();
+    return users.map(({ password, ...safeUser }) => safeUser);
+  },
+
+  async countDocuments(query = {}) {
+    if (isConnectedToMongo()) {
+      return await MongooseUser.countDocuments(query);
+    }
+    return readUsersFromFile().length;
+  },
+
   async findOne(query) {
     if (isConnectedToMongo()) {
       return await MongooseUser.findOne(query);
@@ -105,7 +143,10 @@ const User = {
 
   async create(data) {
     if (isConnectedToMongo()) {
-      return await MongooseUser.create(data);
+      const created = await MongooseUser.create(data);
+      // Auto-mirror to server/data/users.json so user can immediately view registered accounts
+      await User.syncToFile();
+      return created;
     }
     const users = readUsersFromFile();
     // Check unique email
@@ -122,6 +163,7 @@ const User = {
       password: data.password, // already hashed by controller
       walletAddress: data.walletAddress ? data.walletAddress.toLowerCase().trim() : null,
       role: data.role || 'user',
+      status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -133,11 +175,13 @@ const User = {
 
   async findByIdAndUpdate(id, updateData, options = {}) {
     if (isConnectedToMongo()) {
-      return await MongooseUser.findByIdAndUpdate(id, updateData, {
+      const updated = await MongooseUser.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true,
         ...options,
       }).select('-password');
+      await User.syncToFile();
+      return updated;
     }
 
     const users = readUsersFromFile();

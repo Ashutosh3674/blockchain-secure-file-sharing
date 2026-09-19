@@ -13,6 +13,13 @@ const connectDB = async () => {
     });
     isConnectedToMongo = true;
     console.log(`✅ MongoDB Connected successfully: ${mongoose.connection.host}`);
+    try {
+      const User = require('../models/User');
+      await User.syncToFile();
+      console.log(`📁 Database users mirrored to local file (server/data/users.json) for transparent viewing.`);
+    } catch (syncErr) {
+      console.warn('Sync notice:', syncErr.message);
+    }
   } catch (error) {
     console.warn(`⚠️ Local MongoDB not detected (${error.message}).`);
     console.log(`📁 Auto-switching to persistent Local JSON Database engine (server/data/users.json).`);

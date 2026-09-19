@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
+const User = require('../models/User');
 const { protect, optionalAuth } = require('../middleware/auth');
 
 /**
@@ -98,11 +99,13 @@ let ADMIN_USERS_REGISTRY = [
 // @desc    Get Admin Dashboard Overview Metrics
 // @route   GET /api/admin/dashboard
 // @access  Admin
-router.get('/dashboard', optionalAuth, (req, res) => {
+router.get('/dashboard', optionalAuth, async (req, res) => {
   try {
+    const liveUsersCount = await User.countDocuments();
+
     // 4 Canonical Dashboard Metrics
     const headlineMetrics = {
-      totalUsers: 1250,
+      totalUsers: 1250 + (liveUsersCount || 0),
       totalFiles: 5421,
       activeShares: 2310,
       blockchainTx: 8920,
@@ -177,10 +180,37 @@ router.get('/dashboard', optionalAuth, (req, res) => {
 // @desc    Get all users for Admin Inspection
 // @route   GET /api/admin/users
 // @access  Admin
-router.get('/users', optionalAuth, (req, res) => {
+router.get('/users', optionalAuth, async (req, res) => {
   try {
     const { status, filter } = req.query;
-    let list = [...ADMIN_USERS_REGISTRY];
+
+    // Fetch live registered users from database
+    const dbUsers = await User.find();
+
+    const liveAdminUsers = dbUsers.map((u) => {
+      const isSuspended = u.status === 'suspended';
+      return {
+        id: u._id?.toString() || u.id,
+        name: u.name,
+        email: u.email,
+        walletAddress: u.walletAddress || 'Not linked',
+        role: u.role || 'user',
+        status: isSuspended ? 'suspended' : 'active',
+        filesCount: u.filesCount || 0,
+        storageUsedFormatted: `${(((u.storageUsedBytes || 0)) / (1024 * 1024)).toFixed(1)} MB`,
+        createdAt: u.createdAt || new Date().toISOString(),
+        lastActive: u.updatedAt || u.createdAt || new Date().toISOString(),
+        flaggedSuspicious: !!u.flaggedSuspicious,
+        suspiciousReason: u.suspiciousReason || null,
+        isLiveDbUser: true,
+      };
+    });
+
+    // Merge with any demo accounts that don't collide with live emails
+    const liveEmails = new Set(liveAdminUsers.map((u) => u.email.toLowerCase()));
+    const remainingSeeds = ADMIN_USERS_REGISTRY.filter((u) => !liveEmails.has(u.email.toLowerCase()));
+
+    let list = [...liveAdminUsers, ...remainingSeeds];
 
     if (status) {
       list = list.filter((u) => u.status.toLowerCase() === status.toLowerCase());
@@ -189,27 +219,12 @@ router.get('/users', optionalAuth, (req, res) => {
       list = list.filter((u) => u.flaggedSuspicious);
     }
 
-    // Strictly ensure no password hashes or private keys are exposed
-    const sanitizedUsers = list.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      walletAddress: u.walletAddress,
-      role: u.role,
-      status: u.status,
-      filesCount: u.filesCount,
-      storageUsedFormatted: `${(u.storageUsedBytes / (1024 * 1024)).toFixed(1)} MB`,
-      createdAt: u.createdAt,
-      lastActive: u.lastActive,
-      flaggedSuspicious: !!u.flaggedSuspicious,
-      suspiciousReason: u.suspiciousReason || null,
-    }));
-
     res.status(200).json({
       success: true,
-      count: sanitizedUsers.length,
-      totalRegistered: 1250, // Display headline count
-      users: sanitizedUsers,
+      count: list.length,
+      liveUsersCount: liveAdminUsers.length,
+      totalRegistered: Math.max(1250, 1250 + liveAdminUsers.length),
+      users: list,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -219,7 +234,7 @@ router.get('/users', optionalAuth, (req, res) => {
 // @desc    Suspend or Reactivate a User Account
 // @route   PUT /api/admin/users/:userId/status
 // @access  Admin
-router.put('/users/:userId/status', optionalAuth, (req, res) => {
+router.put('/users/:userId/status', optionalAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const { action, reason } = req.body; // action: 'suspend' | 'activate'
@@ -231,37 +246,61 @@ router.put('/users/:userId/status', optionalAuth, (req, res) => {
       });
     }
 
-    const user = ADMIN_USERS_REGISTRY.find((u) => u.id === userId || u.email === userId);
-    if (!user) {
+    const newStatus = action === 'suspend' ? 'suspended' : 'active';
+
+    // 1. Check if user is in DB
+    const dbUser = await User.findById(userId);
+    if (dbUser) {
+      if (dbUser.role === 'admin' && action === 'suspend') {
+        return res.status(403).json({
+          success: false,
+          message: 'Security Policy: Master Administrator account cannot be suspended.',
+        });
+      }
+      const updated = await User.findByIdAndUpdate(userId, {
+        status: newStatus,
+        flaggedSuspicious: action === 'suspend',
+        suspiciousReason: action === 'suspend' ? (reason || 'Suspended by admin review') : null,
+      });
+      return res.status(200).json({
+        success: true,
+        message: `User account "${dbUser.email}" has been successfully ${newStatus}.`,
+        user: {
+          id: dbUser._id || dbUser.id,
+          email: dbUser.email,
+          name: dbUser.name,
+          status: newStatus,
+        },
+      });
+    }
+
+    // 2. Check seed registry
+    const seedUser = ADMIN_USERS_REGISTRY.find((u) => u.id === userId || u.email === userId);
+    if (!seedUser) {
       return res.status(404).json({ success: false, message: 'User account not found' });
     }
 
-    if (user.role === 'admin' && action === 'suspend') {
+    if (seedUser.role === 'admin' && action === 'suspend') {
       return res.status(403).json({
         success: false,
         message: 'Security Policy: Master Administrator account cannot be suspended.',
       });
     }
 
-    user.status = action === 'suspend' ? 'suspended' : 'active';
-    if (action === 'suspend') {
-      user.flaggedSuspicious = true;
-      user.suspiciousReason = reason || 'Suspended by enterprise administrator review.';
-    } else {
-      user.flaggedSuspicious = false;
-      user.suspiciousReason = null;
-    }
+    seedUser.status = newStatus;
+    seedUser.flaggedSuspicious = action === 'suspend';
+    seedUser.suspiciousReason = action === 'suspend' ? (reason || 'Suspended by enterprise administrator review.') : null;
 
     res.status(200).json({
       success: true,
-      message: `User account "${user.email}" has been successfully ${user.status}.`,
+      message: `User account "${seedUser.email}" has been successfully ${seedUser.status}.`,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        status: user.status,
-        flaggedSuspicious: user.flaggedSuspicious,
-        suspiciousReason: user.suspiciousReason,
+        id: seedUser.id,
+        email: seedUser.email,
+        name: seedUser.name,
+        status: seedUser.status,
+        flaggedSuspicious: seedUser.flaggedSuspicious,
+        suspiciousReason: seedUser.suspiciousReason,
       },
     });
   } catch (error) {

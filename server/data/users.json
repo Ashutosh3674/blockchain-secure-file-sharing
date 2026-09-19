@@ -1,0 +1,13 @@
+[
+  {
+    "_id": "6aace913846f03bc3e5e56fb",
+    "id": "6aace913846f03bc3e5e56fb",
+    "name": "Ashutosh",
+    "email": "ashutosh@gmail.com",
+    "walletAddress": "0x82b27f38a65d6b328ac04a045330a84d412e70bb",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-18T07:32:35.789Z",
+    "updatedAt": "2026-09-18T07:33:47.869Z"
+  }
+]

@@ -109,27 +109,31 @@ const register = async (req, res) => {
       cleanWallet = walletAddress.toLowerCase();
     }
 
-    // 6. Create user
+    // 6. Create user (Ashutosh automatically gets admin role for dashboard access)
+    const isAdmin = name.trim().toLowerCase() === 'ashutosh' || cleanEmail.includes('ashutosh');
+    const userRole = isAdmin ? 'admin' : 'user';
+
     const user = await User.create({
       name: name.trim(),
       email: cleanEmail,
       password: hashedPassword,
       walletAddress: cleanWallet,
+      role: userRole,
     });
 
     // 7. Generate Token with standard claims & Respond
-    const token = generateToken(user._id || user.id, user.email, user.role || 'user');
+    const token = generateToken(user._id || user.id, user.email, user.role || userRole);
 
     const safeUser = {
       id: user._id || user.id,
       name: user.name,
       email: user.email,
       walletAddress: user.walletAddress,
-      role: user.role || 'user',
+      role: user.role || userRole,
       createdAt: user.createdAt,
     };
 
-    console.log(`🛡️ [Auth] User "${user.email}" registered with bcrypt (cost: ${BCRYPT_SALT_ROUNDS})`);
+    console.log(`🛡️ [Auth] User "${user.email}" registered successfully (role: ${user.role || userRole}, bcrypt: ${BCRYPT_SALT_ROUNDS} rounds)`);
 
     res.status(201).json({
       success: true,

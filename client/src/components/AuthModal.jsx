@@ -48,6 +48,16 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
   const strength = calculateStrength(password);
   const strengthLabels = ['Too weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
 
+  // Password criteria helper (NIST SP 800-63B)
+  const passCriteria = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password),
+  };
+  const isPassValid = Object.values(passCriteria).every(Boolean);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -59,8 +69,18 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
         setLoading(false);
         return;
       }
-      if (password.length < 6) {
-        setError('Password must be at least 6 characters long.');
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters long (NIST SP 800-63B standard).');
+        setLoading(false);
+        return;
+      }
+      if (!isPassValid) {
+        setError('Password must contain at least one uppercase letter, lowercase letter, number, and special character (!@#$%^&*).');
+        setLoading(false);
+        return;
+      }
+      if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress.trim())) {
+        setError('Invalid Web3 wallet address. Must start with 0x followed by 40 hex characters, or leave blank.');
         setLoading(false);
         return;
       }
@@ -69,7 +89,7 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
         name,
         email,
         password,
-        walletAddress || null
+        walletAddress ? walletAddress.trim() : null
       );
 
       if (res.success) {
@@ -80,10 +100,10 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
             origin: { y: 0.6 },
           });
         } catch {}
-        if (onSuccess) onSuccess('Account created & credentials hashed with bcrypt!');
+        if (onSuccess) onSuccess('Account created & details saved to database!');
         onClose();
       } else {
-        setError(res.error || 'Registration failed');
+        setError(res.error || 'Registration failed. Please check your details.');
       }
     } else {
       // Login
@@ -276,6 +296,35 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginTop: '4px', color: 'var(--text-muted)' }}>
                   <span>Strength: <b style={{ color: strength > 2 ? 'var(--accent-emerald)' : '#f97316' }}>{strengthLabels[strength]}</b></span>
                   <span>Hashed with bcrypt (12 rounds)</span>
+                </div>
+
+                {/* NIST Security Criteria Live Feedback */}
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem 0.65rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '6px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '0.35rem',
+                  fontSize: '0.72rem',
+                }}>
+                  <div style={{ color: passCriteria.length ? 'var(--accent-emerald)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>{passCriteria.length ? '✓' : '○'}</span> 8+ Characters
+                  </div>
+                  <div style={{ color: passCriteria.upper ? 'var(--accent-emerald)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>{passCriteria.upper ? '✓' : '○'}</span> 1 Uppercase (A-Z)
+                  </div>
+                  <div style={{ color: passCriteria.lower ? 'var(--accent-emerald)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>{passCriteria.lower ? '✓' : '○'}</span> 1 Lowercase (a-z)
+                  </div>
+                  <div style={{ color: passCriteria.number ? 'var(--accent-emerald)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>{passCriteria.number ? '✓' : '○'}</span> 1 Number (0-9)
+                  </div>
+                  <div style={{ color: passCriteria.special ? 'var(--accent-emerald)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', gridColumn: 'span 2' }}>
+                    <span>{passCriteria.special ? '✓' : '○'}</span> 1 Special symbol (!@#$%^&*)
+                  </div>
                 </div>
               </div>
             )}
