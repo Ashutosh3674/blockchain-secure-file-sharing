@@ -58,13 +58,19 @@ const ALLOWED_ORIGINS = [
   'https://127.0.0.1:5173',
   'http://localhost:5000',
   'https://localhost:5443',
-];
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
-      if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:')) {
+      if (
+        !origin ||
+        ALLOWED_ORIGINS.includes(origin) ||
+        origin.startsWith('http://localhost:') ||
+        origin.endsWith('.onrender.com')
+      ) {
         callback(null, true);
       } else {
         callback(new Error(`CORS blocked: Origin ${origin} not authorized.`));
@@ -168,12 +174,26 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('🔐 Blockchain Secure File Sharing API is running with Enterprise Security (Password 12-round bcrypt, JWT Auth, HTTPS, and Input Firewall).');
-});
+// ============================================================================
+// 5. PRODUCTION FRONTEND SERVING
+// ============================================================================
+const clientDistPath = path.join(__dirname, '../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.originalUrl.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  // Root route fallback if client is not built
+  app.get('/', (req, res) => {
+    res.send('🔐 Blockchain Secure File Sharing API is running with Enterprise Security.');
+  });
+}
 
-// 404 Route Handler
+// 404 Route Handler for unmatched /api routes
 app.use((req, res) => {
   res.status(404).json({
     success: false,

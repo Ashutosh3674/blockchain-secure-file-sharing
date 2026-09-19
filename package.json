@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Secure File Sharing with Blockchain - Web Application",
   "scripts": {
+    "start": "node server/index.js",
+    "build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
     "server": "node server/index.js",
     "client": "npm --prefix client run dev",
     "dev": "node -e \"const { spawn } = require('child_process'); spawn('npm', ['run', 'server'], { stdio: 'inherit', shell: true }); spawn('npm', ['run', 'client'], { stdio: 'inherit', shell: true });\""
