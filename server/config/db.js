@@ -15,8 +15,9 @@ const connectDB = async () => {
     console.log(`✅ MongoDB Connected successfully: ${mongoose.connection.host}`);
     try {
       const User = require('../models/User');
+      await User.seedDefaultAccounts();
       await User.syncToFile();
-      console.log(`📁 Database users mirrored to local file (server/data/users.json) for transparent viewing.`);
+      console.log(`📁 Database users synchronized with local file (server/data/users.json).`);
     } catch (syncErr) {
       console.warn('Sync notice:', syncErr.message);
     }
@@ -25,6 +26,12 @@ const connectDB = async () => {
     console.log(`📁 Auto-switching to persistent Local JSON Database engine (server/data/users.json).`);
     console.log(`💡 To use MongoDB Atlas, simply set MONGO_URI in server/.env`);
     isConnectedToMongo = false;
+    try {
+      const User = require('../models/User');
+      await User.seedDefaultAccounts();
+    } catch (fallbackErr) {
+      console.warn('Fallback seed notice:', fallbackErr.message);
+    }
   }
 };
 

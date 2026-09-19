@@ -1,9 +1,58 @@
 [
   {
+    "_id": "6aae5d09b3b8f8b3603a6381",
+    "id": "6aae5d09b3b8f8b3603a6381",
+    "name": "Rohit Sharma",
+    "email": "rohit1789811977292@gmail.com",
+    "password": "$2a$12$BeCYavBeq4ePwoBGK7a5nuOWObYQChfdu2Zmm0RaGd.g.6XRpS0B2",
+    "walletAddress": "0x3333333333333333333333333333333333333333",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-19T09:59:37.551Z",
+    "updatedAt": "2026-09-19T09:59:37.551Z"
+  },
+  {
+    "_id": "6aae5d08b3b8f8b3603a6379",
+    "id": "6aae5d08b3b8f8b3603a6379",
+    "name": "Amit",
+    "email": "amit@gmail.com",
+    "password": "$2a$12$gl5RFm2dEKhgMNqcqOEeceSIdb04dOaUsMDQtWjMjPmI32IPF6n0O",
+    "walletAddress": "0x90f79bf6eb2c4f870365e785982e1f101e93b906",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-19T09:59:36.883Z",
+    "updatedAt": "2026-09-19T09:59:36.883Z"
+  },
+  {
+    "_id": "6aae5d08b3b8f8b3603a6376",
+    "id": "6aae5d08b3b8f8b3603a6376",
+    "name": "Priya",
+    "email": "priya@gmail.com",
+    "password": "$2a$12$gl5RFm2dEKhgMNqcqOEeceSIdb04dOaUsMDQtWjMjPmI32IPF6n0O",
+    "walletAddress": "0x15d34aaf54267db7d7c367839aaf71a00a2c6a65",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-19T09:59:36.880Z",
+    "updatedAt": "2026-09-19T09:59:36.880Z"
+  },
+  {
+    "_id": "6aae5d08b3b8f8b3603a6373",
+    "id": "6aae5d08b3b8f8b3603a6373",
+    "name": "Rahul",
+    "email": "rahul@gmail.com",
+    "password": "$2a$12$gl5RFm2dEKhgMNqcqOEeceSIdb04dOaUsMDQtWjMjPmI32IPF6n0O",
+    "walletAddress": "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-19T09:59:36.874Z",
+    "updatedAt": "2026-09-19T09:59:36.874Z"
+  },
+  {
     "_id": "6aace913846f03bc3e5e56fb",
     "id": "6aace913846f03bc3e5e56fb",
     "name": "Ashutosh",
     "email": "ashutosh@gmail.com",
+    "password": "$2a$10$CimeetA3pkWq.8KhaQJ0LusJSbpdBHiLF6Kv6mJZvk1MlViQeVmRa",
     "walletAddress": "0x82b27f38a65d6b328ac04a045330a84d412e70bb",
     "role": "user",
     "status": "active",

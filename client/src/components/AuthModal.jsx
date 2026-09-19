@@ -118,13 +118,21 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
     setLoading(false);
   };
 
-  // Demo autofill for Ashutosh
-  const handleAutofillDemo = () => {
-    setName('Ashutosh');
-    setEmail('ashutosh@gmail.com');
-    setPassword('Password123!');
-    setConfirmPassword('Password123!');
-    setWalletAddress('0x71c67ed3e80435a55611f476c66337051b7b292a');
+  // Demo autofill helpers
+  const handleAutofillDemo = (persona = 'ashutosh') => {
+    if (persona === 'ashutosh') {
+      setName('Ashutosh');
+      setEmail('ashutosh@gmail.com');
+      setPassword('Password123!');
+      setConfirmPassword('Password123!');
+      setWalletAddress('0x71c67ed3e80435a55611f476c66337051b7b292a');
+    } else if (persona === 'rahul') {
+      setName('Rahul');
+      setEmail('rahul@gmail.com');
+      setPassword('Password123!');
+      setConfirmPassword('Password123!');
+      setWalletAddress('0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc');
+    }
     setError(null);
   };
 
@@ -196,19 +204,33 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
           fontSize: '0.8rem',
         }}>
           <span style={{ color: 'var(--text-secondary)' }}>
-            🧪 Quick test with example credentials?
+            🧪 Quick test accounts:
           </span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleAutofillDemo}
-            style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
-          >
-            Fill "Ashutosh"
-          </button>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => handleAutofillDemo('ashutosh')}
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
+              title="Admin account (ashutosh@gmail.com)"
+            >
+              Ashutosh (Admin)
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => handleAutofillDemo('rahul')}
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
+              title="Recipient account (rahul@gmail.com)"
+            >
+              Rahul
+            </button>
+          </div>
         </div>
 
         {/* Error Alert */}
@@ -249,20 +271,22 @@ export const AuthModal = ({ isOpen, initialMode = 'register', onClose, onSuccess
             </div>
           )}
 
-          {/* Email Field */}
+          {/* Email / Username Field */}
           <div className="form-group">
-            <label className="form-label" htmlFor="email">Email Address</label>
+            <label className="form-label" htmlFor="email">
+              {mode === 'login' ? 'Email Address or Username' : 'Email Address'}
+            </label>
             <div className="input-wrapper">
               <Mail size={18} className="input-icon" />
               <input
                 id="email"
-                type="email"
+                type={mode === 'login' ? 'text' : 'email'}
                 required
-                placeholder="ashutosh@gmail.com"
+                placeholder={mode === 'login' ? 'ashutosh@gmail.com or Ashutosh' : 'ashutosh@gmail.com'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="form-input"
-                autoComplete="email"
+                autoComplete={mode === 'login' ? 'username' : 'email'}
               />
             </div>
           </div>

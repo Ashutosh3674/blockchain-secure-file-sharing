@@ -90,7 +90,7 @@ const register = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'An account with this email address already exists',
+        message: 'An account with this email address already exists. Please switch to Sign In.',
       });
     }
 
@@ -165,21 +165,25 @@ const register = async (req, res) => {
 // @desc    Authenticate user & login with Brute-Force Protection
 // @route   POST /api/auth/login
 // @access  Public
+// @desc    Authenticate user & login with Brute-Force Protection
+// @route   POST /api/auth/login
+// @access  Public
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, identifier, password } = req.body;
+    const loginIdentifier = (email || identifier || '').trim();
 
-    if (!email || !password) {
+    if (!loginIdentifier || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email and password',
+        message: 'Please provide email or username, and password',
       });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    const cleanIdentifier = loginIdentifier.toLowerCase();
 
     // 1. Check Brute Force Lockout
-    const attemptRecord = loginAttemptTracker.get(cleanEmail);
+    const attemptRecord = loginAttemptTracker.get(cleanIdentifier);
     const now = Date.now();
     if (attemptRecord && attemptRecord.lockedUntil && attemptRecord.lockedUntil > now) {
       const remainingSeconds = Math.ceil((attemptRecord.lockedUntil - now) / 1000);
@@ -190,28 +194,53 @@ const login = async (req, res) => {
       });
     }
 
-    // 2. Query user
-    const user = await User.findOne({ email: cleanEmail });
+    // 2. Query user by email OR name (case-insensitive) OR walletAddress
+    const escapedIdentifier = cleanIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const user = await User.findOne({
+      $or: [
+        { email: cleanIdentifier },
+        { name: new RegExp('^' + escapedIdentifier + '$', 'i') },
+        { walletAddress: cleanIdentifier },
+      ],
+    });
+
     if (!user) {
-      recordFailedAttempt(cleanEmail);
-      return res.status(401).json({
+      recordFailedAttempt(cleanIdentifier);
+      return res.status(404).json({
         success: false,
-        message: 'Invalid email or password',
+        code: 'ACCOUNT_NOT_FOUND',
+        message: `Account not found for "${loginIdentifier}". Please check your email or create an account.`,
+      });
+    }
+
+    // Check account status if suspended by admin
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account suspended by enterprise administrator review. Please contact support.',
       });
     }
 
     // 3. Compare password with bcrypt
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      recordFailedAttempt(cleanEmail);
+    if (!user.password) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password',
+        message: 'Account credentials need reset. Please re-register your account.',
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      recordFailedAttempt(cleanIdentifier);
+      return res.status(401).json({
+        success: false,
+        code: 'INVALID_PASSWORD',
+        message: 'Incorrect password. Please verify your credentials and try again.',
       });
     }
 
     // Clear failed attempts counter on successful authentication
-    loginAttemptTracker.delete(cleanEmail);
+    loginAttemptTracker.delete(cleanIdentifier);
 
     // 4. Issue JWT Token
     const token = generateToken(user._id || user.id, user.email, user.role || 'user');
@@ -262,11 +291,21 @@ const recordFailedAttempt = (email) => {
 // @access  Private (JWT Required)
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id || req.user.id);
+    const userId = req.user._id || req.user.id;
+    let user = await User.findById(userId);
+
+    // If DB user not found by ID, safely use JWT payload user
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User profile not found',
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: req.user._id || req.user.id,
+          name: req.user.name || 'Authenticated User',
+          email: req.user.email,
+          walletAddress: req.user.walletAddress || null,
+          role: req.user.role || 'user',
+          createdAt: req.user.createdAt || new Date().toISOString(),
+        },
       });
     }
 
