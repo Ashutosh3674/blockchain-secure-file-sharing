@@ -120,13 +120,23 @@ const User = {
       return await MongooseUser.findOne(query);
     }
     const users = readUsersFromFile();
-    const found = users.find((u) => {
-      for (const [key, val] of Object.entries(query)) {
-        if (key === 'email' && u.email.toLowerCase() === String(val).toLowerCase()) return true;
-        if (u[key] === val) return true;
+    const matchCondition = (u, q) => {
+      if (q.$or && Array.isArray(q.$or)) {
+        return q.$or.some((subQ) => matchCondition(u, subQ));
       }
-      return false;
-    });
+      for (const [key, val] of Object.entries(q)) {
+        if (val instanceof RegExp) {
+          if (!val.test(u[key] || '')) return false;
+        } else if (key === 'email') {
+          if ((u.email || '').toLowerCase() !== String(val).toLowerCase()) return false;
+        } else {
+          if (u[key] !== val) return false;
+        }
+      }
+      return true;
+    };
+
+    const found = users.find((u) => matchCondition(u, query));
     return found ? { ...found } : null;
   },
 

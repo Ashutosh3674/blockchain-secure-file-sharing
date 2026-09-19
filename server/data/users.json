@@ -1,5 +1,27 @@
 [
   {
+    "_id": "6aae500baa6569c74b4f98b1",
+    "id": "6aae500baa6569c74b4f98b1",
+    "name": "Sneha Patel",
+    "email": "sneha.patel@testmail.com",
+    "walletAddress": "0xe1b4097ab02a59bc2bf3926926cab98c65cc1d7f",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-19T09:04:11.494Z",
+    "updatedAt": "2026-09-19T09:04:11.494Z"
+  },
+  {
+    "_id": "6aae4f4f76e2a389c92ed029",
+    "id": "6aae4f4f76e2a389c92ed029",
+    "name": "Rahul Verma",
+    "email": "rahul.verma@example.com",
+    "walletAddress": null,
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-09-19T09:01:03.051Z",
+    "updatedAt": "2026-09-19T09:01:03.051Z"
+  },
+  {
     "_id": "6aace913846f03bc3e5e56fb",
     "id": "6aace913846f03bc3e5e56fb",
     "name": "Ashutosh",

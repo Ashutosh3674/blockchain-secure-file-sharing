@@ -389,21 +389,25 @@ export const FileShareManager = ({ onShowToast }) => {
     }
   };
 
-  // Search user by email to resolve wallet
+  // Search user by email, name, or wallet to resolve recipient address
   const handleLookupRecipient = async () => {
-    if (!searchEmailQuery) return;
+    const query = (searchEmailQuery || '').trim();
+    if (!query) {
+      onShowToast('Please enter an email, name, or wallet address to search', 'error');
+      return;
+    }
     setSearchingEmail(true);
     try {
-      const res = await fetch(`/api/auth/lookup?query=${encodeURIComponent(searchEmailQuery)}`);
+      const res = await fetch(`/api/auth/lookup?query=${encodeURIComponent(query)}`);
       const data = await res.json();
-      if (data.success && data.user) {
+      if (data.success && data.user && data.user.walletAddress) {
         setGrantRecipientAddress(data.user.walletAddress);
         onShowToast(`Resolved wallet for ${data.user.name}: ${truncate(data.user.walletAddress)}`);
       } else {
-        onShowToast('No user found with that email. You can still paste any EVM address.', 'error');
+        onShowToast(data.message || 'No user found with that email or name. You can paste any EVM address directly.', 'error');
       }
     } catch (err) {
-      onShowToast('Lookup failed', 'error');
+      onShowToast('Lookup request failed: ' + err.message, 'error');
     } finally {
       setSearchingEmail(false);
     }
@@ -1955,15 +1959,21 @@ export const FileShareManager = ({ onShowToast }) => {
               </button>
             </div>
 
-            {/* Or Search by Email */}
+            {/* Or Search by Email, Name, or Wallet */}
             <div className="form-group">
-              <label className="form-label">Or Lookup Recipient by Registered Email</label>
+              <label className="form-label">Or Lookup Recipient by Registered Email, Name, or Wallet</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <input
-                  type="email"
-                  placeholder="e.g. rahul@gmail.com"
+                  type="text"
+                  placeholder="e.g. ashutosh@gmail.com, Rahul, or 0x3C44..."
                   value={searchEmailQuery}
                   onChange={(e) => setSearchEmailQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleLookupRecipient();
+                    }
+                  }}
                   className="form-input"
                   style={{ flex: 1 }}
                 />
@@ -1972,9 +1982,10 @@ export const FileShareManager = ({ onShowToast }) => {
                   className="btn btn-secondary"
                   onClick={handleLookupRecipient}
                   disabled={searchingEmail}
-                  style={{ padding: '0 1rem' }}
+                  style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
                   <Search size={16} />
+                  <span>{searchingEmail ? 'Searching...' : 'Lookup'}</span>
                 </button>
               </div>
             </div>

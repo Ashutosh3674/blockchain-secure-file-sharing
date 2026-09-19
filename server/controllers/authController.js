@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -97,16 +98,21 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 5. Validate wallet address if provided
+    // 5. Validate wallet address if provided, or auto-derive deterministic Web3 address
     let cleanWallet = null;
-    if (walletAddress) {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+    if (walletAddress && typeof walletAddress === 'string' && walletAddress.trim()) {
+      const trimmed = walletAddress.trim();
+      if (!/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid Ethereum/Web3 wallet address format (must start with 0x followed by 40 hex characters)',
         });
       }
-      cleanWallet = walletAddress.toLowerCase();
+      cleanWallet = trimmed.toLowerCase();
+    } else {
+      // Deterministic EVM wallet derived from email for instant smart contract interoperability
+      const hash = crypto.createHash('sha256').update(cleanEmail).digest('hex');
+      cleanWallet = '0x' + hash.slice(0, 40);
     }
 
     // 6. Create user (Ashutosh automatically gets admin role for dashboard access)
@@ -133,7 +139,7 @@ const register = async (req, res) => {
       createdAt: user.createdAt,
     };
 
-    console.log(`🛡️ [Auth] User "${user.email}" registered successfully (role: ${user.role || userRole}, bcrypt: ${BCRYPT_SALT_ROUNDS} rounds)`);
+    console.log(`🛡️ [Auth] User "${user.email}" registered successfully (role: ${user.role || userRole}, wallet: ${user.walletAddress})`);
 
     res.status(201).json({
       success: true,
@@ -163,35 +169,30 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide both email and password',
+        message: 'Please provide email and password',
       });
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    const now = Date.now();
 
-    // 2. Brute Force Protection: Check if account is temporarily locked
-    const attemptData = loginAttemptTracker.get(cleanEmail);
-    if (attemptData && attemptData.lockedUntil && now < attemptData.lockedUntil) {
-      const remainingSec = Math.ceil((attemptData.lockedUntil - now) / 1000);
-      console.warn(`🛡️ [Auth Security] Locked account login attempt for: ${cleanEmail}`);
+    // 1. Check Brute Force Lockout
+    const attemptRecord = loginAttemptTracker.get(cleanEmail);
+    const now = Date.now();
+    if (attemptRecord && attemptRecord.lockedUntil && attemptRecord.lockedUntil > now) {
+      const remainingSeconds = Math.ceil((attemptRecord.lockedUntil - now) / 1000);
       return res.status(429).json({
         success: false,
-        securityBlocked: true,
-        code: 'ACCOUNT_TEMPORARILY_LOCKED',
-        message: `Account temporarily locked due to multiple failed login attempts. Please try again in ${remainingSec} seconds.`,
-        remainingCooldownSeconds: remainingSec,
+        locked: true,
+        message: `Account temporarily locked due to excessive failed attempts. Please retry in ${remainingSeconds} seconds.`,
       });
     }
 
-    // 3. Find user by email
+    // 2. Query user
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      // Record failed attempt
       recordFailedAttempt(cleanEmail);
       return res.status(401).json({
         success: false,
@@ -199,24 +200,20 @@ const login = async (req, res) => {
       });
     }
 
-    // 4. Compare password with bcrypt hash (timing-safe comparison)
+    // 3. Compare password with bcrypt
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      const attempts = recordFailedAttempt(cleanEmail);
-      const remainingAttempts = Math.max(0, MAX_FAILED_LOGIN_ATTEMPTS - attempts.count);
+      recordFailedAttempt(cleanEmail);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
-        warning: remainingAttempts > 0 && remainingAttempts <= 2
-          ? `Warning: ${remainingAttempts} attempt(s) remaining before temporary account lockout.`
-          : undefined,
       });
     }
 
-    // 5. Successful login: Clear failed attempts counter
+    // Clear failed attempts counter on successful authentication
     loginAttemptTracker.delete(cleanEmail);
 
-    // 6. Generate JWT Token with standard claims
+    // 4. Issue JWT Token
     const token = generateToken(user._id || user.id, user.email, user.role || 'user');
 
     const safeUser = {
@@ -228,19 +225,13 @@ const login = async (req, res) => {
       createdAt: user.createdAt,
     };
 
-    console.log(`🛡️ [Auth] Successful login for "${user.email}". JWT token issued (24h validity).`);
+    console.log(`🔑 [Auth] User "${user.email}" authenticated successfully`);
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'Logged in successfully',
       token,
       user: safeUser,
-      securityMeta: {
-        tokenType: 'Bearer',
-        expiresIn: JWT_EXPIRY,
-        algorithm: 'HS256',
-        issuer: 'blockshare-api',
-      },
     });
   } catch (error) {
     console.error('Login Error:', error);
@@ -252,43 +243,57 @@ const login = async (req, res) => {
   }
 };
 
-// Helper: Track failed login attempts for brute force mitigation
+// Record failed login attempt for brute-force lockouts
 const recordFailedAttempt = (email) => {
   const now = Date.now();
-  const current = loginAttemptTracker.get(email) || { count: 0, lockedUntil: 0 };
-  current.count += 1;
+  const record = loginAttemptTracker.get(email) || { count: 0, lockedUntil: null };
+  record.count += 1;
 
-  if (current.count >= MAX_FAILED_LOGIN_ATTEMPTS) {
-    current.lockedUntil = now + LOCKOUT_DURATION_MS;
-    console.warn(`🛡️ [Auth Security] Account "${email}" locked for 15 minutes after ${current.count} failed attempts.`);
+  if (record.count >= MAX_FAILED_LOGIN_ATTEMPTS) {
+    record.lockedUntil = now + LOCKOUT_DURATION_MS;
+    console.warn(`🚨 [Auth] Brute-force protection triggered: ${email} locked for 15 minutes.`);
   }
 
-  loginAttemptTracker.set(email, current);
-  return current;
+  loginAttemptTracker.set(email, record);
 };
 
-// @desc    Get current user profile
+// @desc    Get currently authenticated user profile
 // @route   GET /api/auth/me
-// @access  Private (Protected by JWT)
+// @access  Private (JWT Required)
 const getMe = async (req, res) => {
   try {
-    const user = req.user;
+    const user = await User.findById(req.user._id || req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User profile not found',
+      });
+    }
+
     res.status(200).json({
       success: true,
-      user,
+      user: {
+        id: user._id || user.id,
+        name: user.name,
+        email: user.email,
+        walletAddress: user.walletAddress,
+        role: user.role || 'user',
+        createdAt: user.createdAt,
+      },
     });
   } catch (error) {
+    console.error('GetMe Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching profile',
+      message: 'Server error while fetching profile',
       error: error.message,
     });
   }
 };
 
-// @desc    Link or update Web3 wallet address
+// @desc    Link Web3 Wallet Address to existing account
 // @route   PUT /api/auth/wallet
-// @access  Private (Protected by JWT)
+// @access  Private (JWT Required)
 const linkWallet = async (req, res) => {
   try {
     const { walletAddress } = req.body;
@@ -296,7 +301,7 @@ const linkWallet = async (req, res) => {
     if (!walletAddress) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a wallet address',
+        message: 'Please provide a wallet address to link',
       });
     }
 
@@ -329,45 +334,112 @@ const linkWallet = async (req, res) => {
   }
 };
 
-// @desc    Lookup user by email or name to find their linked wallet
+// @desc    Lookup user by email, name, or wallet address to resolve EVM recipient wallet
 // @route   GET /api/auth/lookup?query=...
 // @access  Public
 const lookupUser = async (req, res) => {
   try {
     const { query } = req.query;
-    if (!query) {
-      return res.status(400).json({ success: false, message: 'Please provide a search query' });
+    if (!query || !String(query).trim()) {
+      return res.status(400).json({ success: false, message: 'Please provide a search query (email, name, or wallet)' });
     }
 
-    const cleanQuery = query.toLowerCase().trim();
+    const cleanQuery = String(query).toLowerCase().trim();
 
-    // Search real registered users by email, exact name, or wallet address
-    const found = await User.findOne({
-      $or: [
-        { email: cleanQuery },
-        { name: new RegExp('^' + cleanQuery + '$', 'i') },
-        { walletAddress: cleanQuery },
-      ],
-    });
-    if (found) {
+    // Helper: Ensure valid EVM wallet is always available
+    const getOrAssignWallet = (u) => {
+      if (u.walletAddress && /^0x[a-fA-F0-9]{40}$/.test(u.walletAddress)) {
+        return u.walletAddress.toLowerCase();
+      }
+      const hash = crypto.createHash('sha256').update((u.email || u.name || 'user').toLowerCase()).digest('hex');
+      return '0x' + hash.slice(0, 40);
+    };
+
+    // 1. Search Live Database Users (exact or partial matching)
+    const allUsers = await User.find();
+    let matchedUser = allUsers.find((u) => (u.email || '').toLowerCase() === cleanQuery);
+    if (!matchedUser) {
+      matchedUser = allUsers.find((u) => (u.name || '').toLowerCase() === cleanQuery);
+    }
+    if (!matchedUser && cleanQuery.startsWith('0x')) {
+      matchedUser = allUsers.find((u) => (u.walletAddress || '').toLowerCase() === cleanQuery);
+    }
+    if (!matchedUser) {
+      matchedUser = allUsers.find((u) => (u.email || '').toLowerCase().includes(cleanQuery));
+    }
+    if (!matchedUser) {
+      matchedUser = allUsers.find((u) => (u.name || '').toLowerCase().includes(cleanQuery));
+    }
+
+    if (matchedUser) {
+      const resolvedWallet = getOrAssignWallet(matchedUser);
       return res.status(200).json({
         success: true,
         user: {
-          name: found.name,
-          email: found.email,
-          walletAddress: found.walletAddress,
+          name: matchedUser.name,
+          email: matchedUser.email,
+          walletAddress: resolvedWallet,
+          isLiveDbUser: true,
+        },
+      });
+    }
+
+    // 2. Predefined Demo Personas Fallback (for instant testing with Rahul, Priya, Amit, etc.)
+    const DEMO_PERSONAS = [
+      { name: 'Ashutosh', email: 'ashutosh@gmail.com', walletAddress: '0x71c67ed3e80435a55611f476c66337051b7b292a' },
+      { name: 'Rahul (Authorized Recipient)', email: 'rahul@gmail.com', walletAddress: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc' },
+      { name: 'Rahul (Authorized Recipient)', email: 'rahul@blockshare.eth', walletAddress: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc' },
+      { name: 'Priya (Collaborator)', email: 'priya@gmail.com', walletAddress: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65' },
+      { name: 'Priya (Collaborator)', email: 'priya.sharma@enterprise.org', walletAddress: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65' },
+      { name: 'Amit / Stranger (Intruder)', email: 'amit@gmail.com', walletAddress: '0x90f79bf6eb2c4f870365e785982e1f101e93b906' },
+      { name: 'Amit / Stranger (Intruder)', email: 'amit.intruder@tempmail.xyz', walletAddress: '0x90f79bf6eb2c4f870365e785982e1f101e93b906' },
+    ];
+
+    let demoMatch = DEMO_PERSONAS.find((p) => p.email.toLowerCase() === cleanQuery);
+    if (!demoMatch) {
+      demoMatch = DEMO_PERSONAS.find((p) => p.name.toLowerCase() === cleanQuery);
+    }
+    if (!demoMatch && cleanQuery.startsWith('0x')) {
+      demoMatch = DEMO_PERSONAS.find((p) => p.walletAddress.toLowerCase() === cleanQuery);
+    }
+    if (!demoMatch) {
+      demoMatch = DEMO_PERSONAS.find((p) => p.email.toLowerCase().includes(cleanQuery) || p.name.toLowerCase().includes(cleanQuery));
+    }
+
+    if (demoMatch) {
+      return res.status(200).json({
+        success: true,
+        user: {
+          name: demoMatch.name,
+          email: demoMatch.email,
+          walletAddress: demoMatch.walletAddress,
+          isDemoPersona: true,
+        },
+      });
+    }
+
+    // 3. Direct EVM address resolution fallback (if user pastes 0x address into search)
+    if (/^0x[a-fA-F0-9]{40}$/.test(cleanQuery)) {
+      return res.status(200).json({
+        success: true,
+        user: {
+          name: 'Direct EVM Wallet',
+          email: `${cleanQuery.slice(0, 6)}...${cleanQuery.slice(-4)}`,
+          walletAddress: cleanQuery,
+          isDirectAddress: true,
         },
       });
     }
 
     return res.status(404).json({
       success: false,
-      message: 'No registered user found with that email or name',
+      message: `No registered user found matching "${query}". You can paste any 0x EVM wallet address.`,
     });
   } catch (error) {
+    console.error('Lookup error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error looking up user',
+      message: 'Server error while searching user',
       error: error.message,
     });
   }
