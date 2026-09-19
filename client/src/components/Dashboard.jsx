@@ -9,15 +9,15 @@ import { UserDashboardView } from './UserDashboardView';
  * - Admin Users (role === 'admin'): Enterprise Administration Console (AdminDashboardView)
  * - Standard Users (role === 'user'): Decentralized User Workspace (UserDashboardView)
  */
-export const Dashboard = ({ onShowToast }) => {
+export const Dashboard = ({ onShowToast, onNavigateHome }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
   if (isAdmin) {
-    return <AdminDashboardView onShowToast={onShowToast} />;
+    return <AdminDashboardView onShowToast={onShowToast} onNavigateHome={onNavigateHome} />;
   }
 
-  return <UserDashboardView onShowToast={onShowToast} />;
+  return <UserDashboardView onShowToast={onShowToast} onNavigateHome={onNavigateHome} />;
 };
 
 export default Dashboard;

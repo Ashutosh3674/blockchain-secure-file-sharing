@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWeb3 } from '../context/Web3Context';
-import { Shield, Lock, Wallet, LogOut, User, CheckCircle, AlertCircle, ExternalLink, Blocks, Search, Layers } from 'lucide-react';
+import { Shield, Lock, Wallet, LogOut, User, CheckCircle, AlertCircle, ExternalLink, Blocks, Search, Layers, LayoutDashboard } from 'lucide-react';
 import { NotificationsDropdown } from './NotificationsDropdown';
 
 export const Navbar = ({
@@ -14,6 +14,8 @@ export const Navbar = ({
   onNavigateVerify,
   onOpenSystemFlow,
   isVerifyPage,
+  currentView = 'home',
+  onToggleDashboard,
 }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { account, networkName, isConnecting, hasProvider, connectWallet, disconnectWallet } = useWeb3();
@@ -255,20 +257,44 @@ export const Navbar = ({
           {/* User Authentication Status */}
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                padding: '0.35rem 0.85rem',
-                borderRadius: 'var(--radius-full)'
-              }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={onToggleDashboard}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (onToggleDashboard) onToggleDashboard();
+                  }
+                }}
+                title={currentView === 'dashboard' ? 'Currently in Dashboard — Click to view Home page' : `Click to open ${user?.role === 'admin' ? 'Admin' : 'User'} Dashboard`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  background: currentView === 'dashboard'
+                    ? (user?.role === 'admin' ? 'rgba(168, 85, 247, 0.16)' : 'rgba(0, 242, 254, 0.14)')
+                    : 'rgba(255, 255, 255, 0.05)',
+                  border: currentView === 'dashboard'
+                    ? (user?.role === 'admin' ? '1px solid rgba(168, 85, 247, 0.65)' : '1px solid var(--accent-cyan)')
+                    : '1px solid rgba(255, 255, 255, 0.12)',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: 'var(--radius-full)',
+                  cursor: 'pointer',
+                  boxShadow: currentView === 'dashboard'
+                    ? (user?.role === 'admin' ? '0 0 16px rgba(168, 85, 247, 0.3)' : '0 0 16px rgba(0, 242, 254, 0.3)')
+                    : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  userSelect: 'none',
+                }}
+              >
                 <div style={{
                   width: '24px',
                   height: '24px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #00f2fe, #8b5cf6)',
+                  background: user?.role === 'admin'
+                    ? 'linear-gradient(135deg, #c084fc, #8b5cf6)'
+                    : 'linear-gradient(135deg, #00f2fe, #3b82f6)',
                   color: '#050b14',
                   fontWeight: '700',
                   fontSize: '0.75rem',
@@ -284,6 +310,20 @@ export const Navbar = ({
                   style={{ fontSize: '0.68rem', padding: '0.12rem 0.45rem' }}
                 >
                   {user?.role === 'admin' ? 'Admin' : 'User'}
+                </span>
+                <span style={{
+                  fontSize: '0.7rem',
+                  color: currentView === 'dashboard'
+                    ? (user?.role === 'admin' ? '#c084fc' : 'var(--accent-cyan)')
+                    : 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  marginLeft: '2px',
+                  fontWeight: 600,
+                }}>
+                  <LayoutDashboard size={12} />
+                  <span>{currentView === 'dashboard' ? 'Active' : 'Dashboard'}</span>
                 </span>
               </div>
 

@@ -26,10 +26,11 @@ import {
   TrendingUp,
   Sparkles,
   Layers,
+  Home,
 } from 'lucide-react';
 import { UserDashboardView } from './UserDashboardView';
 
-export const AdminDashboardView = ({ onShowToast }) => {
+export const AdminDashboardView = ({ onShowToast, onNavigateHome }) => {
   const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'users' | 'storage' | 'system' | 'files' | 'preview_workspace'
   const [loading, setLoading] = useState(false);
@@ -220,7 +221,25 @@ export const AdminDashboardView = ({ onShowToast }) => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {onNavigateHome && (
+              <button
+                className="btn btn-secondary"
+                onClick={onNavigateHome}
+                style={{
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                }}
+                title="Return to Home Page"
+              >
+                <Home size={15} />
+                <span>Home Page</span>
+              </button>
+            )}
             <button
               className="btn btn-secondary"
               onClick={() => setActiveTab('preview_workspace')}

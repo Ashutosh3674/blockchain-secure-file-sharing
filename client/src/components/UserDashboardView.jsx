@@ -21,13 +21,14 @@ import {
   Star,
   Download,
   AlertCircle,
+  Home,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { FileShareManager } from './FileShareManager';
 import { AnalyticsView } from './AnalyticsView';
 import { contractService, getStoredLogs } from '../services/contractService';
 
-export const UserDashboardView = ({ onShowToast }) => {
+export const UserDashboardView = ({ onShowToast, onNavigateHome }) => {
   const { user, linkWallet } = useAuth();
   const { account, networkName, balance, connectWallet, isConnecting } = useWeb3();
 
@@ -144,7 +145,26 @@ export const UserDashboardView = ({ onShowToast }) => {
           </div>
 
           {/* User Workspace Navigation Tabs */}
-          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {onNavigateHome && (
+              <button
+                className="btn btn-secondary"
+                onClick={onNavigateHome}
+                title="Return to Home Page"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontSize: '0.85rem',
+                  padding: '0.45rem 0.95rem',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <Home size={15} />
+                <span>Home Page</span>
+              </button>
+            )}
             <button
               className="btn btn-primary"
               onClick={() => setActiveTab('files')}

@@ -58,6 +58,7 @@ export function App() {
 
   const [currentShareToken, setCurrentShareToken] = useState(() => parseShareToken());
   const [isVerifyPage, setIsVerifyPage] = useState(() => checkIsVerifyPage());
+  const [currentView, setCurrentView] = useState('home'); // 'home' | 'dashboard'
 
   // Listen to browser back/forward and navigation events
   useEffect(() => {
@@ -81,6 +82,21 @@ export function App() {
     window.history.pushState({}, '', '/');
     setCurrentShareToken(null);
     setIsVerifyPage(false);
+    setCurrentView('home');
+  };
+
+  const handleNavigateDashboard = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentShareToken(null);
+    setIsVerifyPage(false);
+    setCurrentView('dashboard');
+  };
+
+  const handleToggleDashboard = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentShareToken(null);
+    setIsVerifyPage(false);
+    setCurrentView((prev) => (prev === 'dashboard' ? 'home' : 'dashboard'));
   };
 
   const handleNavigateVerify = () => {
@@ -162,9 +178,11 @@ export function App() {
           onNavigateVerify={handleNavigateVerify}
           isVerifyPage={isVerifyPage}
           onShowToast={showToast}
+          currentView={currentView}
+          onToggleDashboard={handleToggleDashboard}
         />
 
-        {/* Main View: SecureShareView if share token is present, FileVerificationPage if on /verify, Dashboard if logged in, Hero landing if guest */}
+        {/* Main View: SecureShareView if share token is present, FileVerificationPage if on /verify, Dashboard if logged in & toggled, Hero landing otherwise */}
         <main style={{ flex: 1 }}>
           {currentShareToken ? (
             <SecureShareView
@@ -178,10 +196,15 @@ export function App() {
               onNavigateHome={handleNavigateHome}
               onShowToast={showToast}
             />
-          ) : isAuthenticated ? (
-            <Dashboard onShowToast={showToast} />
+          ) : (currentView === 'dashboard' && isAuthenticated) ? (
+            <Dashboard onShowToast={showToast} onNavigateHome={handleNavigateHome} />
           ) : (
-            <Hero onOpenAuth={handleOpenAuth} />
+            <Hero
+              onOpenAuth={handleOpenAuth}
+              isAuthenticated={isAuthenticated}
+              user={user}
+              onNavigateDashboard={handleNavigateDashboard}
+            />
           )}
         </main>
 
@@ -232,7 +255,10 @@ export function App() {
         isOpen={authModalOpen}
         initialMode={authMode}
         onClose={() => setAuthModalOpen(false)}
-        onSuccess={(msg) => showToast(msg, 'success')}
+        onSuccess={(msg) => {
+          showToast(msg, 'success');
+          setCurrentView('dashboard');
+        }}
       />
 
       {/* Enterprise Security Control Center Modal */}

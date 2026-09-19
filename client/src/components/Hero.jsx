@@ -1,7 +1,7 @@
 import React from 'react';
-import { Shield, Lock, Cpu, Database, ArrowRight, Wallet, CheckCircle, Sparkles } from 'lucide-react';
+import { Shield, Lock, Cpu, Database, ArrowRight, Wallet, CheckCircle, Sparkles, LayoutDashboard } from 'lucide-react';
 
-export const Hero = ({ onOpenAuth }) => {
+export const Hero = ({ onOpenAuth, isAuthenticated, user, onNavigateDashboard }) => {
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem 5rem', textAlign: 'center' }}>
       
@@ -25,22 +25,43 @@ export const Hero = ({ onOpenAuth }) => {
 
       {/* Call to Actions */}
       <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '4rem' }}>
-        <button
-          className="btn btn-primary"
-          onClick={() => onOpenAuth('register')}
-          style={{ padding: '0.85rem 2rem', fontSize: '1.05rem' }}
-        >
-          <span>Create Free Account</span>
-          <ArrowRight size={18} />
-        </button>
+        {isAuthenticated ? (
+          <button
+            className="btn btn-primary"
+            onClick={onNavigateDashboard}
+            style={{
+              padding: '0.9rem 2.4rem',
+              fontSize: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              boxShadow: user?.role === 'admin' ? '0 0 25px rgba(168, 85, 247, 0.4)' : '0 0 25px rgba(0, 242, 254, 0.4)',
+            }}
+          >
+            <LayoutDashboard size={20} />
+            <span>Open {user?.role === 'admin' ? 'Admin' : 'User'} Dashboard</span>
+            <ArrowRight size={18} />
+          </button>
+        ) : (
+          <>
+            <button
+              className="btn btn-primary"
+              onClick={() => onOpenAuth('register')}
+              style={{ padding: '0.85rem 2rem', fontSize: '1.05rem' }}
+            >
+              <span>Create Free Account</span>
+              <ArrowRight size={18} />
+            </button>
 
-        <button
-          className="btn btn-secondary"
-          onClick={() => onOpenAuth('login')}
-          style={{ padding: '0.85rem 1.8rem', fontSize: '1.05rem' }}
-        >
-          <span>Sign In Existing User</span>
-        </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => onOpenAuth('login')}
+              style={{ padding: '0.85rem 1.8rem', fontSize: '1.05rem' }}
+            >
+              <span>Sign In Existing User</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* 3 Core Pillar Cards */}
