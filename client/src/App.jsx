@@ -9,7 +9,6 @@ import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { TransactionDetailsModal } from './components/TransactionDetailsModal';
 import { FileVerificationPage } from './components/FileVerificationPage';
-import { SystemFlowModal } from './components/SystemFlowModal';
 import { Toast } from './components/Toast';
 import { Shield, Check, Lock, Database, Globe, Key } from 'lucide-react';
 
@@ -23,7 +22,6 @@ export function App() {
   const [securityModalOpen, setSecurityModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [txDetailsModalOpen, setTxDetailsModalOpen] = useState(false);
-  const [systemFlowModalOpen, setSystemFlowModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [viewportMode, setViewportMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
   const [viewportWidth, setViewportWidth] = useState('100%');
@@ -174,7 +172,6 @@ export function App() {
             }
           }}
           onOpenTxDetails={() => setTxDetailsModalOpen(true)}
-          onOpenSystemFlow={() => setSystemFlowModalOpen(true)}
           onNavigateVerify={handleNavigateVerify}
           isVerifyPage={isVerifyPage}
           onShowToast={showToast}
@@ -218,14 +215,9 @@ export function App() {
         color: 'var(--text-muted)',
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div
-            onClick={() => setSystemFlowModalOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
-            title="Click to view Complete System Flow Architecture"
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Shield size={16} color="var(--accent-cyan)" />
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>BlockShare &bull; Secure File Sharing with Blockchain Architecture</span>
-            <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>View Flow</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
@@ -281,13 +273,6 @@ export function App() {
       <TransactionDetailsModal
         isOpen={txDetailsModalOpen}
         onClose={() => setTxDetailsModalOpen(false)}
-        onShowToast={showToast}
-      />
-
-      {/* Complete System Flow Architecture Modal */}
-      <SystemFlowModal
-        isOpen={systemFlowModalOpen}
-        onClose={() => setSystemFlowModalOpen(false)}
         onShowToast={showToast}
       />
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useWeb3 } from '../context/Web3Context';
-import { Shield, Lock, Wallet, LogOut, User, CheckCircle, AlertCircle, ExternalLink, Blocks, Search, Layers, LayoutDashboard } from 'lucide-react';
+import { Shield, Lock, Wallet, LogOut, User, CheckCircle, AlertCircle, ExternalLink, Blocks, Search, LayoutDashboard } from 'lucide-react';
 import { NotificationsDropdown } from './NotificationsDropdown';
 
 export const Navbar = ({
@@ -12,7 +12,6 @@ export const Navbar = ({
   onOpenAdmin,
   onOpenTxDetails,
   onNavigateVerify,
-  onOpenSystemFlow,
   isVerifyPage,
   currentView = 'home',
   onToggleDashboard,
@@ -89,28 +88,6 @@ export const Navbar = ({
         {/* Action Controls & Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           
-          {/* Complete System Flow Architecture Button */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onOpenSystemFlow}
-            title="View Complete System Flow Architecture (User -> React -> Auth -> Node -> MongoDB/Crypto -> IPFS -> Contract -> Blockchain)"
-            style={{
-              fontSize: '0.8rem',
-              padding: '0.35rem 0.85rem',
-              borderColor: 'rgba(56, 189, 248, 0.45)',
-              background: 'rgba(56, 189, 248, 0.1)',
-              color: '#38bdf8',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              fontWeight: 600,
-            }}
-          >
-            <Layers size={14} />
-            <span>🏗️ System Flow</span>
-          </button>
-
           {/* File Verification Page Button */}
           <button
             type="button"
