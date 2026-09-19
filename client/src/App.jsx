@@ -16,7 +16,7 @@ import { Shield, Check, Lock, Database, Globe, Key } from 'lucide-react';
 import { DevicePreviewBar } from './components/DevicePreviewBar';
 
 export function App() {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('register');
@@ -150,7 +150,13 @@ export function App() {
           onOpenAuth={handleOpenAuth}
           onNavigateHome={handleNavigateHome}
           onOpenSecurity={() => setSecurityModalOpen(true)}
-          onOpenAdmin={() => setAdminModalOpen(true)}
+          onOpenAdmin={() => {
+            if (user?.role === 'admin') {
+              setAdminModalOpen(true);
+            } else {
+              showToast('Access Denied: Enterprise Administrator privileges required.', 'error');
+            }
+          }}
           onOpenTxDetails={() => setTxDetailsModalOpen(true)}
           onOpenSystemFlow={() => setSystemFlowModalOpen(true)}
           onNavigateVerify={handleNavigateVerify}
@@ -236,12 +242,14 @@ export function App() {
         onShowToast={showToast}
       />
 
-      {/* Admin Panel Dashboard Modal */}
-      <AdminDashboardModal
-        isOpen={adminModalOpen}
-        onClose={() => setAdminModalOpen(false)}
-        onShowToast={showToast}
-      />
+      {/* Admin Panel Dashboard Modal (Strictly for Enterprise Admins) */}
+      {user?.role === 'admin' && (
+        <AdminDashboardModal
+          isOpen={adminModalOpen}
+          onClose={() => setAdminModalOpen(false)}
+          onShowToast={showToast}
+        />
+      )}
 
       {/* Blockchain Transaction Details & Verification Modal */}
       <TransactionDetailsModal

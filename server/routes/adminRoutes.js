@@ -3,11 +3,13 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const User = require('../models/User');
-const { protect, optionalAuth } = require('../middleware/auth');
+const { protect, requireAdmin } = require('../middleware/auth');
 
 /**
  * 🧑💼 adminRoutes.js
  * Enterprise Administration Portal API
+ * Strictly protected by Role-Based Access Control (RBAC: role === 'admin')
+ */
  *
  * Requirements:
  * 1. Admin dashboard headline metrics:
@@ -98,8 +100,8 @@ let ADMIN_USERS_REGISTRY = [
 
 // @desc    Get Admin Dashboard Overview Metrics
 // @route   GET /api/admin/dashboard
-// @access  Admin
-router.get('/dashboard', optionalAuth, async (req, res) => {
+// @access  Admin (Role-Based Access Control)
+router.get('/dashboard', protect, requireAdmin, async (req, res) => {
   try {
     const liveUsersCount = await User.countDocuments();
 
@@ -179,8 +181,8 @@ router.get('/dashboard', optionalAuth, async (req, res) => {
 
 // @desc    Get all users for Admin Inspection
 // @route   GET /api/admin/users
-// @access  Admin
-router.get('/users', optionalAuth, async (req, res) => {
+// @access  Admin (Role-Based Access Control)
+router.get('/users', protect, requireAdmin, async (req, res) => {
   try {
     const { status, filter } = req.query;
 
@@ -233,8 +235,8 @@ router.get('/users', optionalAuth, async (req, res) => {
 
 // @desc    Suspend or Reactivate a User Account
 // @route   PUT /api/admin/users/:userId/status
-// @access  Admin
-router.put('/users/:userId/status', optionalAuth, async (req, res) => {
+// @access  Admin (Role-Based Access Control)
+router.put('/users/:userId/status', protect, requireAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
     const { action, reason } = req.body; // action: 'suspend' | 'activate'
@@ -254,7 +256,7 @@ router.put('/users/:userId/status', optionalAuth, async (req, res) => {
       if (dbUser.role === 'admin' && action === 'suspend') {
         return res.status(403).json({
           success: false,
-          message: 'Security Policy: Master Administrator account cannot be suspended.',
+          message: 'Security Policy: Administrator account cannot be suspended.',
         });
       }
       const updated = await User.findByIdAndUpdate(userId, {
@@ -283,7 +285,7 @@ router.put('/users/:userId/status', optionalAuth, async (req, res) => {
     if (seedUser.role === 'admin' && action === 'suspend') {
       return res.status(403).json({
         success: false,
-        message: 'Security Policy: Master Administrator account cannot be suspended.',
+        message: 'Security Policy: Administrator account cannot be suspended.',
       });
     }
 
@@ -310,8 +312,8 @@ router.put('/users/:userId/status', optionalAuth, async (req, res) => {
 
 // @desc    Inspect files in system (VERIFY ZERO-KNOWLEDGE: Decryption keys are strictly stripped)
 // @route   GET /api/admin/files
-// @access  Admin
-router.get('/files', optionalAuth, (req, res) => {
+// @access  Admin (Role-Based Access Control)
+router.get('/files', protect, requireAdmin, (req, res) => {
   try {
     const IPFS_DIR = path.join(__dirname, '..', 'data', 'ipfs_storage');
     let files = [];

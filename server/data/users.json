@@ -54,9 +54,9 @@
     "email": "ashutosh@gmail.com",
     "password": "$2a$10$CimeetA3pkWq.8KhaQJ0LusJSbpdBHiLF6Kv6mJZvk1MlViQeVmRa",
     "walletAddress": "0x82b27f38a65d6b328ac04a045330a84d412e70bb",
-    "role": "user",
+    "role": "admin",
     "status": "active",
     "createdAt": "2026-09-18T07:32:35.789Z",
-    "updatedAt": "2026-09-18T07:33:47.869Z"
+    "updatedAt": "2026-09-19T10:15:19.426Z"
   }
 ]

@@ -176,11 +176,15 @@ const User = {
               role: acc.role,
             });
             console.log(`🌱 [Seed] Created default account: ${acc.email}`);
+          } else if (acc.role === 'admin' && existing.role !== 'admin') {
+            existing.role = 'admin';
+            await existing.save();
+            console.log(`👑 [Seed] Elevated ${acc.email} to admin role in MongoDB`);
           }
         }
       }
 
-      // Also ensure file DB has password for default accounts
+      // Also ensure file DB has password and correct roles for default accounts
       const fileUsers = readUsersFromFile();
       let fileUpdated = false;
 
@@ -200,9 +204,15 @@ const User = {
             updatedAt: new Date().toISOString(),
           });
           fileUpdated = true;
-        } else if (!found.password) {
-          found.password = defaultHash;
-          fileUpdated = true;
+        } else {
+          if (!found.password) {
+            found.password = defaultHash;
+            fileUpdated = true;
+          }
+          if (acc.role === 'admin' && found.role !== 'admin') {
+            found.role = 'admin';
+            fileUpdated = true;
+          }
         }
       }
 

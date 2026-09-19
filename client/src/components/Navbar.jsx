@@ -152,26 +152,28 @@ export const Navbar = ({
             <span style={{ fontWeight: 600 }}>⛓️ Verify Tx</span>
           </button>
 
-          {/* Admin Panel Button */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onOpenAdmin}
-            title="Open Enterprise Admin Dashboard (Users, Suspensions, Storage, Telemetry)"
-            style={{
-              fontSize: '0.8rem',
-              padding: '0.35rem 0.85rem',
-              borderColor: 'rgba(139, 92, 246, 0.45)',
-              background: 'rgba(139, 92, 246, 0.1)',
-              color: '#c084fc',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-            }}
-          >
-            <Shield size={14} />
-            <span style={{ fontWeight: 600 }}>🧑💼 Admin Panel</span>
-          </button>
+          {/* Admin Panel Button (Strictly Restricted to Enterprise Admins) */}
+          {user?.role === 'admin' && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onOpenAdmin}
+              title="Open Enterprise Admin Dashboard (Users, Suspensions, Storage, Telemetry)"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.35rem 0.85rem',
+                borderColor: 'rgba(139, 92, 246, 0.45)',
+                background: 'rgba(139, 92, 246, 0.1)',
+                color: '#c084fc',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <Shield size={14} />
+              <span style={{ fontWeight: 600 }}>🧑💼 Admin Panel</span>
+            </button>
+          )}
 
           {/* Security Center Button */}
           <button
@@ -277,6 +279,12 @@ export const Navbar = ({
                   {user?.name?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{user?.name}</span>
+                <span
+                  className={`badge ${user?.role === 'admin' ? 'badge-purple' : 'badge-emerald'}`}
+                  style={{ fontSize: '0.68rem', padding: '0.12rem 0.45rem' }}
+                >
+                  {user?.role === 'admin' ? 'Admin' : 'User'}
+                </span>
               </div>
 
               <button
