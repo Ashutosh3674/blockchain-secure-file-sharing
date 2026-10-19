@@ -27,6 +27,7 @@ import {
   Sparkles,
   Layers,
   Home,
+  Share2,
 } from 'lucide-react';
 import { UserDashboardView } from './UserDashboardView';
 
@@ -152,8 +153,8 @@ export const AdminDashboardView = ({ onShowToast, onNavigateHome }) => {
     return true;
   });
 
-  // If Admin wants to preview the User Workspace:
-  if (activeTab === 'preview_workspace') {
+  // If Admin wants to open the File Sharing Workspace / User Dashboard:
+  if (activeTab === 'preview_workspace' || activeTab === 'workspace') {
     return (
       <div>
         <div style={{
@@ -171,8 +172,8 @@ export const AdminDashboardView = ({ onShowToast, onNavigateHome }) => {
           backdropFilter: 'blur(10px)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c084fc', fontSize: '0.9rem', fontWeight: 600 }}>
-            <Eye size={18} />
-            <span>Administrator Preview Mode: Viewing Client Workspace Perspective</span>
+            <Share2 size={18} color="var(--accent-cyan)" />
+            <span>Administrator Workspace: File Encryption &amp; Decentralized Sharing Active</span>
           </div>
           <button
             className="btn btn-primary"
@@ -270,6 +271,7 @@ export const AdminDashboardView = ({ onShowToast, onNavigateHome }) => {
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1.25rem', flexWrap: 'wrap' }}>
           {[
             { id: 'overview', label: 'System Overview', icon: Activity },
+            { id: 'workspace', label: 'File Sharing Workspace', icon: Share2 },
             { id: 'users', label: `Users Management (${users.length})`, icon: Users },
             { id: 'system', label: 'Node Telemetry', icon: Cpu },
             { id: 'storage', label: 'IPFS Storage Nodes', icon: HardDrive },
@@ -517,7 +519,7 @@ export const AdminDashboardView = ({ onShowToast, onNavigateHome }) => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Node Version:</span>
-                <span style={{ fontFamily: 'monospace' }}>{systemStats?.serverNodeVersion || process.version || 'v20.x'}</span>
+                <span style={{ fontFamily: 'monospace' }}>{systemStats?.serverNodeVersion || 'v20.18.0'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>RSS Memory Usage:</span>

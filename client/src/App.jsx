@@ -12,8 +12,6 @@ import { FileVerificationPage } from './components/FileVerificationPage';
 import { Toast } from './components/Toast';
 import { Shield } from 'lucide-react';
 
-import { DevicePreviewBar } from './components/DevicePreviewBar';
-
 export function App() {
   const { user, isAuthenticated, loading } = useAuth();
 
@@ -23,8 +21,6 @@ export function App() {
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [txDetailsModalOpen, setTxDetailsModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
-  const [viewportMode, setViewportMode] = useState('desktop'); // 'desktop' | 'laptop' | 'tablet' | 'mobile'
-  const [viewportWidth, setViewportWidth] = useState('100%');
 
   // Extract share token from URL (/share/:token, ?share=:token, or #/share/:token)
   const parseShareToken = () => {
@@ -75,6 +71,15 @@ export function App() {
       window.removeEventListener('blockshare_navigate', handleLocationChange);
     };
   }, []);
+
+  // Automatically navigate to dashboard upon login, and home upon logout
+  useEffect(() => {
+    if (isAuthenticated) {
+      setCurrentView('dashboard');
+    } else {
+      setCurrentView('home');
+    }
+  }, [isAuthenticated]);
 
   const handleNavigateHome = () => {
     window.history.pushState({}, '', '/');
@@ -133,85 +138,59 @@ export function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
-      
-      {/* 📱 Interactive Responsive Form Factor Simulator (Desktop, Laptop, Tablet, Mobile) */}
-      <DevicePreviewBar
-        activeMode={viewportMode}
-        onModeChange={(mode, width) => {
-          setViewportMode(mode);
-          setViewportWidth(width);
+      {/* Top Navigation */}
+      <Navbar
+        onOpenAuth={handleOpenAuth}
+        onNavigateHome={handleNavigateHome}
+        onOpenSecurity={() => {
+          if (user?.role === 'admin') {
+            setSecurityModalOpen(true);
+          } else {
+            showToast('Access Denied: Security Control Center is restricted to Administrators.', 'error');
+          }
         }}
-        currentWidth={viewportWidth}
+        onOpenAdmin={() => {
+          if (user?.role === 'admin') {
+            setAdminModalOpen(true);
+          } else {
+            showToast('Access Denied: Enterprise Administrator privileges required.', 'error');
+          }
+        }}
+        onOpenTxDetails={() => setTxDetailsModalOpen(true)}
+        onNavigateVerify={handleNavigateVerify}
+        isVerifyPage={isVerifyPage}
+        onShowToast={showToast}
+        currentView={currentView}
+        onToggleDashboard={handleToggleDashboard}
       />
 
-      {/* Responsive Viewport Frame (Simulates tablet/mobile widths seamlessly) */}
-      <div
-        style={{
-          width: '100%',
-          maxWidth: viewportWidth,
-          margin: '0 auto',
-          transition: 'max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: viewportWidth !== '100%' ? '0 0 50px rgba(0, 242, 254, 0.15)' : 'none',
-          borderLeft: viewportWidth !== '100%' ? '1px solid rgba(56, 189, 248, 0.2)' : 'none',
-          borderRight: viewportWidth !== '100%' ? '1px solid rgba(56, 189, 248, 0.2)' : 'none',
-        }}
-      >
-        {/* Top Navigation */}
-        <Navbar
-          onOpenAuth={handleOpenAuth}
-          onNavigateHome={handleNavigateHome}
-          onOpenSecurity={() => {
-            if (user?.role === 'admin') {
-              setSecurityModalOpen(true);
-            } else {
-              showToast('Access Denied: Security Control Center is restricted to Administrators.', 'error');
-            }
-          }}
-          onOpenAdmin={() => {
-            if (user?.role === 'admin') {
-              setAdminModalOpen(true);
-            } else {
-              showToast('Access Denied: Enterprise Administrator privileges required.', 'error');
-            }
-          }}
-          onOpenTxDetails={() => setTxDetailsModalOpen(true)}
-          onNavigateVerify={handleNavigateVerify}
-          isVerifyPage={isVerifyPage}
-          onShowToast={showToast}
-          currentView={currentView}
-          onToggleDashboard={handleToggleDashboard}
-        />
+      {/* Main View: SecureShareView if share token is present, FileVerificationPage if on /verify, Dashboard if logged in & toggled, Hero landing otherwise */}
+      <main style={{ flex: 1 }}>
+        {currentShareToken ? (
+          <SecureShareView
+            shareToken={currentShareToken}
+            onNavigateHome={handleNavigateHome}
+            onShowToast={showToast}
+            onOpenAuth={handleOpenAuth}
+          />
+        ) : isVerifyPage ? (
+          <FileVerificationPage
+            onNavigateHome={handleNavigateHome}
+            onShowToast={showToast}
+          />
+        ) : (currentView === 'dashboard' && isAuthenticated) ? (
+          <Dashboard onShowToast={showToast} onNavigateHome={handleNavigateHome} />
+        ) : (
+          <Hero
+            onOpenAuth={handleOpenAuth}
+            isAuthenticated={isAuthenticated}
+            user={user}
+            onNavigateDashboard={handleNavigateDashboard}
+          />
+        )}
+      </main>
 
-        {/* Main View: SecureShareView if share token is present, FileVerificationPage if on /verify, Dashboard if logged in & toggled, Hero landing otherwise */}
-        <main style={{ flex: 1 }}>
-          {currentShareToken ? (
-            <SecureShareView
-              shareToken={currentShareToken}
-              onNavigateHome={handleNavigateHome}
-              onShowToast={showToast}
-              onOpenAuth={handleOpenAuth}
-            />
-          ) : isVerifyPage ? (
-            <FileVerificationPage
-              onNavigateHome={handleNavigateHome}
-              onShowToast={showToast}
-            />
-          ) : (currentView === 'dashboard' && isAuthenticated) ? (
-            <Dashboard onShowToast={showToast} onNavigateHome={handleNavigateHome} />
-          ) : (
-            <Hero
-              onOpenAuth={handleOpenAuth}
-              isAuthenticated={isAuthenticated}
-              user={user}
-              onNavigateDashboard={handleNavigateDashboard}
-            />
-          )}
-        </main>
-
-        {/* Footer */}
+      {/* Footer */}
       <footer style={{
         marginTop: 'auto',
         borderTop: '1px solid rgba(255, 255, 255, 0.08)',
@@ -231,7 +210,6 @@ export function App() {
           </div>
         </div>
       </footer>
-      </div>
 
       {/* Auth Modal (Register / Login) */}
       <AuthModal

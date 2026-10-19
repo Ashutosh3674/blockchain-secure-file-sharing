@@ -590,7 +590,29 @@ router.post('/grant-access', optionalAuth, (req, res) => {
       return res.status(400).json({ success: false, message: 'ipfsHash and recipientAddress are required' });
     }
 
-    const cleanRecipient = recipientAddress.toLowerCase().trim();
+    const KNOWN_MAP = {
+      '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': 'rahul@gmail.com',
+      '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65': 'priya@gmail.com',
+      '0x90f79bf6eb2c4f870365e785982e1f101e93b906': 'amit@gmail.com',
+      '0x82b27f38a65d6b328ac04a045330a84d412e70bb': 'ashutosh@gmail.com',
+      '0x71c67ed3e80435a55611f476c66337051b7b292a': 'ashutosh@gmail.com',
+      'rahul@gmail.com': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+      'priya@gmail.com': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+      'amit@gmail.com': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      'ashutosh@gmail.com': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+    };
+
+    let cleanRecipient = recipientAddress.toLowerCase().trim();
+    let cleanEmail = (recipientEmail || '').toLowerCase().trim();
+
+    if (!cleanEmail && KNOWN_MAP[cleanRecipient] && KNOWN_MAP[cleanRecipient].includes('@')) {
+      cleanEmail = KNOWN_MAP[cleanRecipient];
+    }
+    if (cleanRecipient.includes('@') && KNOWN_MAP[cleanRecipient]) {
+      cleanEmail = cleanRecipient;
+      cleanRecipient = KNOWN_MAP[cleanRecipient];
+    }
+
     let file = SERVER_SHARE_REGISTRY.find((f) => f.ipfsHash === ipfsHash);
 
     if (!file) {
@@ -601,28 +623,33 @@ router.post('/grant-access', optionalAuth, (req, res) => {
     if (!file.authorizedRecipients.includes(cleanRecipient)) {
       file.authorizedRecipients.push(cleanRecipient);
     }
-    if (recipientEmail && typeof recipientEmail === 'string') {
-      const cleanEmail = recipientEmail.toLowerCase().trim();
-      if (!file.authorizedRecipients.includes(cleanEmail)) {
-        file.authorizedRecipients.push(cleanEmail);
-      }
+    if (cleanEmail && !file.authorizedRecipients.includes(cleanEmail)) {
+      file.authorizedRecipients.push(cleanEmail);
     }
 
-    if (!file.permissions) file.permissions = {};
-    file.permissions[cleanRecipient] = {
+    const permData = {
       isAuthorized: true,
       expiresAt: Number(expiresAt) || 0,
       maxDownloads: Number(maxDownloads) || 0,
-      downloadCount: (file.permissions[cleanRecipient] && file.permissions[cleanRecipient].downloadCount) || 0,
+      downloadCount: (file.permissions && file.permissions[cleanRecipient] && file.permissions[cleanRecipient].downloadCount) || 0,
     };
+
+    if (!file.permissions) file.permissions = {};
+    file.permissions[cleanRecipient] = permData;
+    if (cleanEmail) {
+      file.permissions[cleanEmail] = permData;
+    }
 
     if (wrappedKey) {
       if (!file.wrappedKeys) file.wrappedKeys = {};
       file.wrappedKeys[cleanRecipient] = wrappedKey;
+      if (cleanEmail) {
+        file.wrappedKeys[cleanEmail] = wrappedKey;
+      }
     }
 
     saveServerFiles(SERVER_SHARE_REGISTRY);
-    console.log(`🤝 [Access Granted] File "${file.fileName}" access granted to ${cleanRecipient} on server`);
+    console.log(`🤝 [Access Granted] File "${file.fileName}" access granted to ${cleanRecipient} (${cleanEmail || 'no-email'}) on server`);
     res.status(200).json({ success: true, file });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

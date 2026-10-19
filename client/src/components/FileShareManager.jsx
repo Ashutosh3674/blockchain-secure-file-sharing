@@ -51,35 +51,39 @@ import { keyManagementService } from '../services/keyManagementService';
 const PERSONAS = [
   {
     id: 'ashutosh',
-    name: 'Ashutosh (Owner)',
-    address: '0x71c67ed3e80435a55611f476c66337051b7b292a',
-    role: 'Owner',
+    name: 'Ashutosh (Admin / Owner)',
+    email: 'ashutosh@gmail.com',
+    address: '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+    role: 'Admin / Owner',
     color: '#00f2fe',
     badgeClass: 'badge-cyan',
   },
   {
     id: 'rahul',
     name: 'Rahul (Authorized Recipient)',
+    email: 'rahul@gmail.com',
     address: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
     role: 'Recipient',
     color: '#10b981',
     badgeClass: 'badge-emerald',
   },
   {
-    id: 'stranger',
-    name: 'Amit / Stranger (Intruder)',
-    address: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
-    role: 'Unauthorized',
-    color: '#f43f5e',
-    badgeClass: 'badge-rose',
-  },
-  {
     id: 'priya',
     name: 'Priya (Collaborator)',
+    email: 'priya@gmail.com',
     address: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
     role: 'Collaborator',
     color: '#a855f7',
     badgeClass: 'badge-purple',
+  },
+  {
+    id: 'stranger',
+    name: 'Amit / Stranger (Intruder)',
+    email: 'amit@gmail.com',
+    address: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+    role: 'Unauthorized',
+    color: '#f43f5e',
+    badgeClass: 'badge-rose',
   },
 ];
 
@@ -163,14 +167,24 @@ export const FileShareManager = ({ onShowToast }) => {
     const ownerAddr = f.owner.toLowerCase();
     const activeAddr = (activePersona?.address || '').toLowerCase();
     const userWallet = (user?.walletAddress || '').toLowerCase();
-    const userEmail = (user?.email || '').toLowerCase();
+    const userEmail = (user?.email || activePersona?.email || '').toLowerCase();
+
+    // Ashutosh owner alias matching
+    const isAshutoshOwner = (ownerAddr === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || ownerAddr === '0x71c67ed3e80435a55611f476c66337051b7b292a');
+    const isAshutoshActive = (activeAddr === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || activeAddr === '0x71c67ed3e80435a55611f476c66337051b7b292a');
 
     // If I am the file owner, it belongs in "My Files", not "Shared With Me"
-    if (ownerAddr === activeAddr || (userWallet && ownerAddr === userWallet)) {
+    if (ownerAddr === activeAddr || (userWallet && ownerAddr === userWallet) || (isAshutoshOwner && isAshutoshActive)) {
       return false;
     }
 
-    // Check if recipient is authorized or file is public
+    // Direct check via contract service with wallet and email
+    const accessVerdict = contractService.hasAccess(f.ipfsHash, activeAddr || userWallet, userEmail);
+    if (accessVerdict.hasAccess && accessVerdict.role !== 'Owner') {
+      return true;
+    }
+
+    // Check if recipient address or email is in authorizedRecipients
     const isRecipient = (f.authorizedRecipients || []).some((r) => {
       if (!r) return false;
       const cleanR = r.toLowerCase();
@@ -272,6 +286,7 @@ export const FileShareManager = ({ onShowToast }) => {
       setActivePersona({
         id: 'user_account',
         name: user.name ? `${user.name} (My Account)` : 'My Account',
+        email: user.email || '',
         address: user.walletAddress.toLowerCase(),
         role: user.role === 'admin' ? 'Admin' : 'Registered User',
         color: '#00f2fe',
@@ -378,18 +393,42 @@ export const FileShareManager = ({ onShowToast }) => {
   // Grant Access with Envelope Key Wrapping
   const handleGrantAccess = async (e) => {
     e.preventDefault();
-    if (!selectedFileForGrant || !grantRecipientAddress) {
-      onShowToast('Please enter a recipient wallet address', 'error');
+    const rawTarget = (grantRecipientAddress || searchEmailQuery || '').trim();
+    if (!selectedFileForGrant || !rawTarget) {
+      onShowToast('Please select or enter a recipient (email, name, or wallet address)', 'error');
       return;
     }
 
+    const KNOWN_MAP = {
+      'rahul@gmail.com': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+      'priya@gmail.com': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+      'amit@gmail.com': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      'ashutosh@gmail.com': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+      'rahul': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+      'priya': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+      'amit': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      'ashutosh': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+    };
+
+    let targetWallet = rawTarget.toLowerCase();
+    let targetEmail = (searchEmailQuery || '').trim().toLowerCase();
+
+    if (KNOWN_MAP[targetWallet]) {
+      if (targetWallet.includes('@')) targetEmail = targetWallet;
+      targetWallet = KNOWN_MAP[targetWallet];
+    } else if (targetWallet.includes('@')) {
+      targetEmail = targetWallet;
+      if (KNOWN_MAP[targetEmail]) targetWallet = KNOWN_MAP[targetEmail];
+    }
+
     try {
-      onShowToast(`Fetching recipient's Public Key & wrapping AES file key with RSA-OAEP...`);
+      const recipientName = getPersonaNameByAddress(targetWallet) || targetEmail || targetWallet;
+      onShowToast(`Wrapping AES file key with ${recipientName}'s RSA-OAEP public key...`);
 
       // 1. Retrieve recipient's public key (e.g. Rahul's PK)
       let recipientPubKey = null;
       try {
-        recipientPubKey = await keyManagementService.getRecipientPublicKey(grantRecipientAddress);
+        recipientPubKey = await keyManagementService.getRecipientPublicKey(targetWallet);
       } catch (pkErr) {
         console.warn('Could not generate recipient public key:', pkErr);
       }
@@ -412,12 +451,12 @@ export const FileShareManager = ({ onShowToast }) => {
 
       const res = await contractService.grantAccess(
         selectedFileForGrant.ipfsHash,
-        grantRecipientAddress,
+        targetWallet,
         activePersona.address,
         wrappedKey,
         expiryMs,
         maxDownloadsNum,
-        searchEmailQuery
+        targetEmail
       );
 
       if (res.success) {
@@ -426,7 +465,7 @@ export const FileShareManager = ({ onShowToast }) => {
           ? ` (Expires: ${new Date(expiryMs).toLocaleString()})`
           : ' (Permanent Access)';
         const quotaMsg = maxDownloadsNum > 0 ? ` [Limit: ${maxDownloadsNum} Downloads]` : '';
-        onShowToast(`Access granted to ${truncate(grantRecipientAddress)}${expiryMsg}${quotaMsg}!`);
+        onShowToast(`Access granted on blockchain to ${recipientName}${expiryMsg}${quotaMsg}!`);
         setSelectedFileForGrant(null);
         setGrantRecipientAddress('');
         setSearchEmailQuery('');
@@ -599,11 +638,18 @@ export const FileShareManager = ({ onShowToast }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
           
           {/* 5 Metrics Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
             {/* 1. My Files */}
-            <div style={{ background: 'rgba(0, 242, 254, 0.06)', border: '1px solid rgba(0, 242, 254, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>📁 My Files</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%)',
+              border: '1px solid rgba(0, 242, 254, 0.35)',
+              padding: '0.95rem 1.1rem',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 4px 20px rgba(0, 242, 254, 0.1)',
+              transition: 'all 0.25s ease',
+            }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>📁 My Files</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--accent-cyan)', textShadow: '0 0 15px rgba(0, 242, 254, 0.4)' }}>
                 {files.filter((f) => f.owner.toLowerCase() === activePersona.address.toLowerCase()).length}
               </span>
             </div>
@@ -612,41 +658,65 @@ export const FileShareManager = ({ onShowToast }) => {
             <div
               onClick={() => setActiveTab('shared_with_me')}
               style={{
-                background: activeTab === 'shared_with_me' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.06)',
-                border: `1px solid ${activeTab === 'shared_with_me' ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.2)'}`,
-                padding: '0.85rem 1rem',
-                borderRadius: 'var(--radius-sm)',
+                background: activeTab === 'shared_with_me'
+                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.12) 100%)'
+                  : 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 182, 212, 0.04) 100%)',
+                border: `1px solid ${activeTab === 'shared_with_me' ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.35)'}`,
+                padding: '0.95rem 1.1rem',
+                borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.12)',
+                transition: 'all 0.25s ease',
               }}
               title="Click to view files shared with you"
             >
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>📥 Shared With Me</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>📥 Shared With Me</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--accent-emerald)', textShadow: '0 0 15px rgba(16, 185, 129, 0.4)' }}>
                 {sharedWithMeFiles.length}
               </span>
             </div>
 
             {/* 3. Shared By Me */}
-            <div style={{ background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>📤 Shared By Me</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-purple)' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.14) 0%, rgba(236, 72, 153, 0.04) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.35)',
+              padding: '0.95rem 1.1rem',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 4px 20px rgba(168, 85, 247, 0.12)',
+              transition: 'all 0.25s ease',
+            }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>📤 Shared By Me</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--accent-purple)', textShadow: '0 0 15px rgba(168, 85, 247, 0.4)' }}>
                 {files.filter((f) => f.owner.toLowerCase() === activePersona.address.toLowerCase() && f.authorizedRecipients?.length > 0).length}
               </span>
             </div>
 
             {/* 4. Active Shares */}
-            <div style={{ background: 'rgba(56, 189, 248, 0.06)', border: '1px solid rgba(56, 189, 248, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>🟢 Active Shares</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.14) 0%, rgba(59, 130, 246, 0.04) 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              padding: '0.95rem 1.1rem',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 4px 20px rgba(56, 189, 248, 0.12)',
+              transition: 'all 0.25s ease',
+            }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>🟢 Active Shares</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#38bdf8', textShadow: '0 0 15px rgba(56, 189, 248, 0.4)' }}>
                 {files.reduce((acc, f) => acc + (f.owner.toLowerCase() === activePersona.address.toLowerCase() ? (Object.values(f.permissions || {}).filter(p => p.isAuthorized && (!p.expiresAt || p.expiresAt > Date.now())).length) : 0), 0)}
               </span>
             </div>
 
             {/* 5. Expired Shares */}
-            <div style={{ background: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>⏰ Expired Shares</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-rose)' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.14) 0%, rgba(245, 158, 11, 0.04) 100%)',
+              border: '1px solid rgba(244, 63, 94, 0.35)',
+              padding: '0.95rem 1.1rem',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 4px 20px rgba(244, 63, 94, 0.12)',
+              transition: 'all 0.25s ease',
+            }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px', fontWeight: 600 }}>⏰ Expired Shares</span>
+              <span style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--accent-rose)', textShadow: '0 0 15px rgba(244, 63, 94, 0.4)' }}>
                 {files.reduce((acc, f) => acc + (f.owner.toLowerCase() === activePersona.address.toLowerCase() ? (Object.values(f.permissions || {}).filter(p => p.isAuthorized && p.expiresAt && p.expiresAt <= Date.now()).length) : 0), 0)}
               </span>
             </div>
@@ -711,12 +781,18 @@ export const FileShareManager = ({ onShowToast }) => {
             className="btn btn-secondary"
             onClick={() => setActiveTab('shared_with_me')}
             style={{
-              background: activeTab === 'shared_with_me' ? 'rgba(16, 185, 129, 0.15)' : undefined,
-              borderColor: activeTab === 'shared_with_me' ? 'var(--accent-emerald)' : undefined,
+              background: activeTab === 'shared_with_me' ? 'rgba(16, 185, 129, 0.2)' : sharedWithMeFiles.length > 0 ? 'rgba(16, 185, 129, 0.08)' : undefined,
+              borderColor: activeTab === 'shared_with_me' ? 'var(--accent-emerald)' : sharedWithMeFiles.length > 0 ? 'rgba(16, 185, 129, 0.45)' : undefined,
+              boxShadow: sharedWithMeFiles.length > 0 ? '0 0 14px rgba(16, 185, 129, 0.25)' : undefined,
             }}
           >
             <Download size={16} color="var(--accent-emerald)" />
-            <span>📥 Shared With Me ({sharedWithMeFiles.length})</span>
+            <span>📥 Shared With Me</span>
+            {sharedWithMeFiles.length > 0 && (
+              <span className="badge badge-emerald" style={{ marginLeft: '4px', fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}>
+                {sharedWithMeFiles.length} New
+              </span>
+            )}
           </button>
           <button
             className="btn btn-secondary"
@@ -757,6 +833,127 @@ export const FileShareManager = ({ onShowToast }) => {
       {/* Tab 1: Files Registry - MY FILES View */}
       {activeTab === 'files' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {/* 📥 PROMINENT INBOUND SHARED FILES BANNER (Directly visible to recipient!) */}
+          {sharedWithMeFiles.length > 0 && (
+            <div
+              className="glass-panel"
+              style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(56, 189, 248, 0.08) 100%)',
+                border: '1px solid rgba(16, 185, 129, 0.45)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.25rem 1.5rem',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.15)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: 'rgba(16, 185, 129, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#34d399',
+                    border: '1px solid rgba(16, 185, 129, 0.5)',
+                  }}>
+                    <Download size={22} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#34d399' }}>
+                        📥 Files Shared With You ({sharedWithMeFiles.length})
+                      </h4>
+                      <span className="badge badge-emerald" style={{ fontSize: '0.72rem' }}>
+                        Cryptographic Access Ready
+                      </span>
+                    </div>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      These files have been shared with your account. You can download and decrypt the original plaintext in memory.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setActiveTab('shared_with_me')}
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
+                >
+                  View Full Inbound Table &rarr;
+                </button>
+              </div>
+
+              {/* Shared files quick card list */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '1rem' }}>
+                {sharedWithMeFiles.map((f) => {
+                  const sender = f.ownerName || getPersonaNameByAddress(f.owner);
+                  return (
+                    <div
+                      key={f.ipfsHash}
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '1rem 1.15rem',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '0.85rem',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+                          <span className="badge badge-purple" style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}>
+                            Shared by: {sender}
+                          </span>
+                          <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>
+                            {(f.fileSize / (1024 * 1024)).toFixed(2)} MB
+                          </span>
+                        </div>
+                        <h5 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc', wordBreak: 'break-word' }}>
+                          {f.fileName}
+                        </h5>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          IPFS CID: <code className="mono" style={{ color: 'var(--accent-cyan)' }}>{truncate(f.ipfsHash, 14)}</code>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleDownloadAndDecrypt(f)}
+                          style={{
+                            flex: 1,
+                            fontSize: '0.82rem',
+                            padding: '0.45rem 0.85rem',
+                            background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <Download size={14} />
+                          <span>Download &amp; Decrypt</span>
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setIntegrityModalFile(f);
+                            setSimulateTamper(false);
+                          }}
+                          style={{ fontSize: '0.78rem', padding: '0.45rem 0.65rem' }}
+                          title="Verify SHA-256 Checksum"
+                        >
+                          <ShieldCheck size={14} color="#34d399" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           
           {/* MY FILES Section Banner & Filter */}
           <div style={{
@@ -890,9 +1087,16 @@ export const FileShareManager = ({ onShowToast }) => {
             files
               .filter((f) => fileFilter === 'all' || f.owner.toLowerCase() === activePersona.address.toLowerCase())
               .map((file) => {
-              const isOwner = file.owner.toLowerCase() === activePersona.address.toLowerCase();
-              const accessCheck = contractService.hasAccess(file.ipfsHash, activePersona.address);
+              const activeAddr = (activePersona?.address || '').toLowerCase();
+              const userWallet = (user?.walletAddress || '').toLowerCase();
+              const userEmail = (user?.email || activePersona?.email || '').toLowerCase();
+              const isOwner = file.owner.toLowerCase() === activeAddr ||
+                (userWallet && file.owner.toLowerCase() === userWallet) ||
+                ((activeAddr === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || activeAddr === '0x71c67ed3e80435a55611f476c66337051b7b292a') &&
+                 (file.owner.toLowerCase() === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || file.owner.toLowerCase() === '0x71c67ed3e80435a55611f476c66337051b7b292a'));
+              const accessCheck = contractService.hasAccess(file.ipfsHash, activeAddr || userWallet, userEmail);
               const hasAccess = accessCheck.hasAccess;
+              const isSharedWithMe = !isOwner && hasAccess;
 
               return (
                 <div
@@ -933,6 +1137,25 @@ export const FileShareManager = ({ onShowToast }) => {
                           <h3 style={{ fontSize: '1.22rem', margin: 0, fontWeight: 700, letterSpacing: '-0.2px' }}>
                             {file.fileName}
                           </h3>
+                          {isSharedWithMe && (
+                            <span
+                              className="badge badge-emerald"
+                              style={{
+                                fontSize: '0.74rem',
+                                padding: '0.2rem 0.65rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                background: 'rgba(16, 185, 129, 0.2)',
+                                border: '1px solid rgba(16, 185, 129, 0.5)',
+                                color: '#34d399',
+                                boxShadow: '0 0 10px rgba(16, 185, 129, 0.25)',
+                              }}
+                            >
+                              <Download size={12} />
+                              📥 Shared With You by {file.ownerName || getPersonaNameByAddress(file.owner)}
+                            </span>
+                          )}
                           {file.status === 'crypto_shredded' ? (
                             <span
                               className="badge badge-rose"
@@ -2038,54 +2261,129 @@ export const FileShareManager = ({ onShowToast }) => {
               File: <b style={{ color: 'var(--accent-cyan)' }}>{selectedFileForGrant.fileName}</b>
             </p>
 
-            {/* Quick 1-Click Recipient Buttons */}
-            <div style={{
-              background: 'rgba(56, 189, 248, 0.08)',
-              border: '1px dashed rgba(56, 189, 248, 0.3)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '0.75rem',
-              marginBottom: '1.25rem',
-            }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                💡 Quick select example recipient:
-              </span>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setGrantRecipientAddress('0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc')}
-                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', borderRadius: '4px' }}
-              >
-                Select "Rahul" (0x3C44...93BC)
-              </button>
+            {/* 👥 1-Click Recipient Selection */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 600 }}>1. Choose Team Member or Recipient</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>1-Click Instant Selection</span>
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                {[
+                  { name: 'Rahul', email: 'rahul@gmail.com', address: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc', role: 'Recipient', color: '#10b981' },
+                  { name: 'Priya', email: 'priya@gmail.com', address: '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65', role: 'Collaborator', color: '#a855f7' },
+                  { name: 'Amit', email: 'amit@gmail.com', address: '0x90f79bf6eb2c4f870365e785982e1f101e93b906', role: 'User', color: '#f43f5e' },
+                  { name: 'Ashutosh', email: 'ashutosh@gmail.com', address: '0x82b27f38a65d6b328ac04a045330a84d412e70bb', role: 'Admin', color: '#00f2fe' },
+                ]
+                  .filter((m) => m.address.toLowerCase() !== activePersona.address.toLowerCase())
+                  .map((m) => {
+                    const isSelected =
+                      (grantRecipientAddress && grantRecipientAddress.toLowerCase() === m.address.toLowerCase()) ||
+                      (searchEmailQuery && searchEmailQuery.toLowerCase() === m.email.toLowerCase());
+
+                    return (
+                      <button
+                        key={m.email}
+                        type="button"
+                        onClick={() => {
+                          setGrantRecipientAddress(m.address);
+                          setSearchEmailQuery(m.email);
+                        }}
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '0.65rem 0.5rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 0, 0, 0.3)',
+                          borderColor: isSelected ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+                          boxShadow: isSelected ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: isSelected ? '#34d399' : '#f8fafc' }}>
+                            {m.name}
+                          </span>
+                          {isSelected && <CheckCircle2 size={13} color="#34d399" />}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{m.email}</span>
+                      </button>
+                    );
+                  })}
+              </div>
             </div>
 
-            {/* Or Search by Email, Name, or Wallet */}
-            <div className="form-group">
-              <label className="form-label">Or Lookup Recipient by Registered Email, Name, or Wallet</label>
+            {/* Selected Recipient Confirmation Badge */}
+            {(grantRecipientAddress || searchEmailQuery) && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.65rem 0.85rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.82rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <CheckCircle2 size={16} color="#34d399" />
+                  <span>
+                    Selected: <b style={{ color: '#34d399' }}>{getPersonaNameByAddress(grantRecipientAddress) || searchEmailQuery}</b>
+                    {searchEmailQuery ? ` (${searchEmailQuery})` : ''}
+                  </span>
+                </div>
+                <code className="mono" style={{ fontSize: '0.74rem', color: 'var(--accent-cyan)' }}>
+                  {truncate(grantRecipientAddress || '0x...')}
+                </code>
+              </div>
+            )}
+
+            {/* Custom Input */}
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                Or Type Name, Email, or EVM Wallet Address:
+              </label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <input
                   type="text"
-                  placeholder="e.g. ashutosh@gmail.com, Rahul, or 0x3C44..."
-                  value={searchEmailQuery}
-                  onChange={(e) => setSearchEmailQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleLookupRecipient();
+                  placeholder="e.g. rahul@gmail.com, priya, or 0x3C44..."
+                  value={searchEmailQuery || grantRecipientAddress}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchEmailQuery(val);
+                    const cleanVal = val.trim().toLowerCase();
+                    const KNOWN = {
+                      'rahul@gmail.com': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+                      'priya@gmail.com': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+                      'amit@gmail.com': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+                      'ashutosh@gmail.com': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+                      'rahul': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+                      'priya': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+                      'amit': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+                      'ashutosh': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+                    };
+                    if (KNOWN[cleanVal]) {
+                      setGrantRecipientAddress(KNOWN[cleanVal]);
+                    } else if (cleanVal.startsWith('0x')) {
+                      setGrantRecipientAddress(cleanVal);
                     }
                   }}
                   className="form-input"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, fontSize: '0.85rem' }}
                 />
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={handleLookupRecipient}
                   disabled={searchingEmail}
-                  style={{ padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  style={{ padding: '0 0.85rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
-                  <Search size={16} />
-                  <span>{searchingEmail ? 'Searching...' : 'Lookup'}</span>
+                  <Search size={14} />
+                  <span>{searchingEmail ? '...' : 'Lookup'}</span>
                 </button>
               </div>
             </div>
@@ -2106,21 +2404,8 @@ export const FileShareManager = ({ onShowToast }) => {
               }}>
                 <Lock size={15} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
                 <span>
-                  <b>🔒 Private Sharing Mode (Default):</b> File access is strictly restricted to this designated recipient wallet (e.g. Rahul). Strangers will be denied on the blockchain ledger.
+                  <b>🔒 Private Sharing Mode (Default):</b> File AES-256 key will be wrapped with the recipient's RSA Public Key and recorded on the blockchain. Only this recipient can decrypt the file.
                 </span>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Recipient's EVM Wallet Address</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-                  value={grantRecipientAddress}
-                  onChange={(e) => setGrantRecipientAddress(e.target.value)}
-                  className="form-input mono"
-                  style={{ fontSize: '0.85rem' }}
-                />
               </div>
 
               {/* Time-Limited Expiry Selector */}
@@ -2186,10 +2471,10 @@ export const FileShareManager = ({ onShowToast }) => {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1.2, background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' }}
                 >
                   <Key size={16} />
-                  <span>Confirm on Blockchain</span>
+                  <span>Confirm &amp; Share on Blockchain</span>
                 </button>
               </div>
             </form>

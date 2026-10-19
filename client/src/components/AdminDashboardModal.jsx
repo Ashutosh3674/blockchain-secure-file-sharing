@@ -697,7 +697,7 @@ export const AdminDashboardModal = ({ isOpen, onClose, onShowToast }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Server Node:</span>
-                  <code className="mono">{systemStats?.serverNodeVersion || process.version}</code>
+                  <code className="mono">{systemStats?.serverNodeVersion || 'v20.18.0'}</code>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Memory (RSS):</span>

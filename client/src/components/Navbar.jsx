@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWeb3 } from '../context/Web3Context';
 import { Shield, Lock, Wallet, LogOut, User, CheckCircle, AlertCircle, ExternalLink, Blocks, Search, LayoutDashboard } from 'lucide-react';
 import { NotificationsDropdown } from './NotificationsDropdown';
+import { ThemeSelector } from './ThemeSelector';
 
 export const Navbar = ({
   onOpenAuth,
@@ -49,7 +50,7 @@ export const Navbar = ({
   const isAdmin = user?.role === 'admin' || user?.email?.includes('ashutosh') || true; // Demo admin access
 
   return (
-    <header className="glass-panel" style={{ margin: '1rem 1.5rem', padding: '0.85rem 1.75rem', borderRadius: '16px', position: 'sticky', top: '1rem', zIndex: 1000 }}>
+    <header className="glass-panel" style={{ margin: '1rem 1.5rem', padding: '0.85rem 1.75rem', borderRadius: '16px', position: 'relative', zIndex: 100 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         
         {/* Brand */}
@@ -88,150 +89,158 @@ export const Navbar = ({
         {/* Action Controls & Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           
-          {/* File Verification Page Button */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onNavigateVerify}
-            title="Open Dedicated File Verification Page (Hash Matching & Tamper Detection)"
-            style={{
-              fontSize: '0.8rem',
-              padding: '0.35rem 0.85rem',
-              borderColor: isVerifyPage ? 'var(--accent-cyan)' : 'rgba(0, 242, 254, 0.35)',
-              background: isVerifyPage ? 'rgba(0, 242, 254, 0.2)' : 'rgba(0, 242, 254, 0.08)',
-              color: 'var(--accent-cyan)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              fontWeight: 600,
-            }}
-          >
-            <Search size={14} />
-            <span>🔎 File Verification</span>
-          </button>
-          
-          {/* Transaction Verification Button */}
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onOpenTxDetails}
-            title="Verify Blockchain Ledger Transactions"
-            style={{
-              fontSize: '0.8rem',
-              padding: '0.35rem 0.85rem',
-              borderColor: 'rgba(56, 189, 248, 0.4)',
-              background: 'rgba(56, 189, 248, 0.08)',
-              color: '#38bdf8',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-            }}
-          >
-            <Blocks size={14} />
-            <span style={{ fontWeight: 600 }}>⛓️ Verify Tx</span>
-          </button>
-
-          {/* Admin Panel Button (Strictly Restricted to Enterprise Admins) */}
-          {user?.role === 'admin' && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onOpenAdmin}
-              title="Open Enterprise Admin Dashboard (Users, Suspensions, Storage, Telemetry)"
-              style={{
-                fontSize: '0.8rem',
-                padding: '0.35rem 0.85rem',
-                borderColor: 'rgba(139, 92, 246, 0.45)',
-                background: 'rgba(139, 92, 246, 0.1)',
-                color: '#c084fc',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-              }}
-            >
-              <Shield size={14} />
-              <span style={{ fontWeight: 600 }}>🧑💼 Admin Panel</span>
-            </button>
-          )}
-
-          {/* Security Center Button - Strictly Restricted to Admin */}
-          {user?.role === 'admin' && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onOpenSecurity}
-              title="Open Enterprise Security Control Center (Administrator Only)"
-              style={{
-                fontSize: '0.8rem',
-                padding: '0.35rem 0.85rem',
-                borderColor: 'rgba(0, 242, 254, 0.4)',
-                background: 'rgba(0, 242, 254, 0.08)',
-                color: 'var(--accent-cyan)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-              }}
-            >
-              <Shield size={15} />
-              <span style={{ fontWeight: 600 }}>Security Center</span>
-            </button>
-          )}
-
-          {/* 🔔 Real-Time Notifications Center */}
-          <NotificationsDropdown onShowToast={onShowToast} />
-
-          {/* Web3 Network Badge */}
-          {networkName && (
-            <div className="badge badge-purple" style={{ padding: '0.35rem 0.75rem' }}>
-              <span className="pulse-dot"></span>
-              <span>{networkName}</span>
-            </div>
-          )}
-
-          {/* Web3 Wallet Connect Button */}
-          {account ? (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: 'rgba(245, 130, 32, 0.1)',
-              border: '1px solid rgba(245, 130, 32, 0.3)',
-              borderRadius: 'var(--radius-full)',
-              padding: '0.35rem 0.85rem',
-              color: '#fca34d'
-            }}>
-              <Wallet size={16} />
-              <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                {truncateAddress(account)}
-              </span>
+          {/* Features & Actions — Strictly rendered ONLY after user logs in */}
+          {isAuthenticated && (
+            <>
+              {/* File Verification Page Button */}
               <button
-                onClick={disconnectWallet}
-                title="Disconnect Wallet"
+                type="button"
+                className="btn btn-secondary"
+                onClick={onNavigateVerify}
+                title="Open Dedicated File Verification Page (Hash Matching & Tamper Detection)"
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '2px',
+                  fontSize: '0.8rem',
+                  padding: '0.35rem 0.85rem',
+                  borderColor: isVerifyPage ? 'var(--accent-cyan)' : 'rgba(0, 242, 254, 0.35)',
+                  background: isVerifyPage ? 'rgba(0, 242, 254, 0.2)' : 'rgba(0, 242, 254, 0.08)',
+                  color: 'var(--accent-cyan)',
                   display: 'flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontWeight: 600,
                 }}
               >
-                &times;
+                <Search size={14} />
+                <span>🔎 File Verification</span>
               </button>
-            </div>
-          ) : (
-            <button
-              className="btn btn-wallet"
-              onClick={handleWalletConnect}
-              disabled={isConnecting}
-              title={hasProvider ? "Connect MetaMask Web3 Wallet" : "MetaMask not detected in browser — Click to initialize secure In-Browser Web3 session"}
-              style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-            >
-              <Wallet size={16} />
-              <span>{isConnecting ? 'Connecting...' : (hasProvider ? 'Connect Wallet' : 'Web3 Session')}</span>
-            </button>
+              
+              {/* Transaction Verification Button */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onOpenTxDetails}
+                title="Verify Blockchain Ledger Transactions"
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '0.35rem 0.85rem',
+                  borderColor: 'rgba(56, 189, 248, 0.4)',
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  color: '#38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                }}
+              >
+                <Blocks size={14} />
+                <span style={{ fontWeight: 600 }}>⛓️ Verify Tx</span>
+              </button>
+
+              {/* Admin Panel Button (Strictly Restricted to Enterprise Admins) */}
+              {user?.role === 'admin' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={onOpenAdmin}
+                  title="Open Enterprise Admin Dashboard (Users, Suspensions, Storage, Telemetry)"
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '0.35rem 0.85rem',
+                    borderColor: 'rgba(139, 92, 246, 0.45)',
+                    background: 'rgba(139, 92, 246, 0.1)',
+                    color: '#c084fc',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                  }}
+                >
+                  <Shield size={14} />
+                  <span style={{ fontWeight: 600 }}>🧑💼 Admin Panel</span>
+                </button>
+              )}
+
+              {/* Security Center Button - Strictly Restricted to Admin */}
+              {user?.role === 'admin' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={onOpenSecurity}
+                  title="Open Enterprise Security Control Center (Administrator Only)"
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '0.35rem 0.85rem',
+                    borderColor: 'rgba(0, 242, 254, 0.4)',
+                    background: 'rgba(0, 242, 254, 0.08)',
+                    color: 'var(--accent-cyan)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                  }}
+                >
+                  <Shield size={15} />
+                  <span style={{ fontWeight: 600 }}>Security Center</span>
+                </button>
+              )}
+
+              {/* 🔔 Real-Time Notifications Center */}
+              <NotificationsDropdown onShowToast={onShowToast} />
+
+              {/* Web3 Network Badge */}
+              {networkName && (
+                <div className="badge badge-purple" style={{ padding: '0.35rem 0.75rem' }}>
+                  <span className="pulse-dot"></span>
+                  <span>{networkName}</span>
+                </div>
+              )}
+
+              {/* Web3 Wallet Connect Button */}
+              {account ? (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  background: 'rgba(245, 130, 32, 0.1)',
+                  border: '1px solid rgba(245, 130, 32, 0.3)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '0.35rem 0.85rem',
+                  color: '#fca34d'
+                }}>
+                  <Wallet size={16} />
+                  <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                    {truncateAddress(account)}
+                  </span>
+                  <button
+                    onClick={disconnectWallet}
+                    title="Disconnect Wallet"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="btn btn-wallet"
+                  onClick={handleWalletConnect}
+                  disabled={isConnecting}
+                  title={hasProvider ? "Connect MetaMask Web3 Wallet" : "MetaMask not detected in browser — Click to initialize secure In-Browser Web3 session"}
+                  style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+                >
+                  <Wallet size={16} />
+                  <span>{isConnecting ? 'Connecting...' : (hasProvider ? 'Connect Wallet' : 'Web3 Session')}</span>
+                </button>
+              )}
+            </>
           )}
+
+          {/* 🎨 Theme Color Palette Selector (Always available) */}
+          <ThemeSelector onShowToast={onShowToast} />
 
           {/* User Authentication Status */}
           {isAuthenticated ? (

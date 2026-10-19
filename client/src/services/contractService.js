@@ -26,6 +26,11 @@ const STORAGE_KEY_LOGS = 'blockshare_chain_logs_v3';
 export const getPersonaNameByAddress = (address) => {
   if (!address) return 'Unknown';
   const clean = address.toLowerCase();
+  if (clean === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || clean === '0x71c67ed3e80435a55611f476c66337051b7b292a') return 'Ashutosh';
+  if (clean === '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc') return 'Rahul';
+  if (clean === '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65') return 'Priya';
+  if (clean === '0x90f79bf6eb2c4f870365e785982e1f101e93b906') return 'Amit';
+  if (clean.includes('@')) return clean.split('@')[0];
   return clean.slice(0, 6) + '...' + clean.slice(-4);
 };
 
@@ -321,11 +326,35 @@ export const contractService = {
   // 2. Grant Access to Recipient (with wrapped AES key, optional expiry & max download quota)
   async grantAccess(ipfsHash, recipientAddress, currentAddress, wrappedKey = null, expiresAt = 0, maxDownloads = 0, recipientEmail = '') {
     const cleanAddress = (currentAddress || '').toLowerCase();
-    const cleanRecipient = (recipientAddress || '').toLowerCase().trim();
-    const cleanEmail = (recipientEmail || '').toLowerCase().trim();
+    let cleanRecipient = (recipientAddress || '').toLowerCase().trim();
+    let cleanEmail = (recipientEmail || '').toLowerCase().trim();
+
+    // Smart resolver: if cleanRecipient is an email or username, resolve it
+    const KNOWN_WALLETS = {
+      'rahul@gmail.com': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+      'priya@gmail.com': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+      'amit@gmail.com': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      'ashutosh@gmail.com': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+      'rahul': '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+      'priya': '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65',
+      'amit': '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+      'ashutosh': '0x82b27f38a65d6b328ac04a045330a84d412e70bb',
+    };
+
+    if (KNOWN_WALLETS[cleanRecipient]) {
+      if (cleanRecipient.includes('@')) cleanEmail = cleanRecipient;
+      cleanRecipient = KNOWN_WALLETS[cleanRecipient];
+    } else if (cleanRecipient.includes('@')) {
+      cleanEmail = cleanRecipient;
+      let hash = '0x';
+      for (let i = 0; i < cleanEmail.length; i++) {
+        hash += cleanEmail.charCodeAt(i).toString(16);
+      }
+      cleanRecipient = (hash + '0000000000000000000000000000000000000000').slice(0, 42);
+    }
 
     if (!cleanRecipient.startsWith('0x') || cleanRecipient.length !== 42) {
-      throw new Error('Invalid Ethereum recipient address (must be 42 characters starting with 0x)');
+      throw new Error('Please enter a valid recipient address (0x...) or registered email (e.g. rahul@gmail.com)');
     }
 
     const files = getStoredFiles();
@@ -335,9 +364,13 @@ export const contractService = {
       throw new Error('File not found on blockchain');
     }
 
-    // Owner check
-    if (targetFile.owner.toLowerCase() !== cleanAddress) {
-      throw new Error(`Access Denied: Only file owner (${targetFile.owner.slice(0, 6)}...) can grant access. You are ${cleanAddress.slice(0, 6)}...`);
+    // Owner check with Ashutosh alias support
+    const isOwner = targetFile.owner.toLowerCase() === cleanAddress ||
+      ((cleanAddress === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || cleanAddress === '0x71c67ed3e80435a55611f476c66337051b7b292a') &&
+       (targetFile.owner.toLowerCase() === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || targetFile.owner.toLowerCase() === '0x71c67ed3e80435a55611f476c66337051b7b292a'));
+
+    if (!isOwner) {
+      throw new Error(`Access Denied: Only file owner (${targetFile.owner.slice(0, 6)}...) can grant access.`);
     }
 
     if (!targetFile.authorizedRecipients) targetFile.authorizedRecipients = [];
@@ -547,7 +580,11 @@ export const contractService = {
       };
     }
 
-    if (cleanAddr && file.owner && file.owner.toLowerCase() === cleanAddr) {
+    const isOwner = (cleanAddr && file.owner && file.owner.toLowerCase() === cleanAddr) ||
+      ((cleanAddr === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || cleanAddr === '0x71c67ed3e80435a55611f476c66337051b7b292a') &&
+       (file.owner.toLowerCase() === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || file.owner.toLowerCase() === '0x71c67ed3e80435a55611f476c66337051b7b292a'));
+
+    if (isOwner) {
       return { hasAccess: true, role: 'Owner', mode: file.isPublic ? 'Public' : 'Private', reason: 'You are the file creator & owner' };
     }
 
@@ -561,9 +598,30 @@ export const contractService = {
       };
     }
 
+    const KNOWN_MAP = {
+      '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': 'rahul@gmail.com',
+      '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65': 'priya@gmail.com',
+      '0x90f79bf6eb2c4f870365e785982e1f101e93b906': 'amit@gmail.com',
+      '0x82b27f38a65d6b328ac04a045330a84d412e70bb': 'ashutosh@gmail.com',
+      '0x71c67ed3e80435a55611f476c66337051b7b292a': 'ashutosh@gmail.com',
+    };
+    const mappedEmail = KNOWN_MAP[cleanAddr] || '';
+    const mappedWallet = Object.keys(KNOWN_MAP).find((k) => KNOWN_MAP[k] === cleanEmail) || '';
+
     const authorizedList = (file.authorizedRecipients || []).map((r) => r.toLowerCase());
-    const isAuthorized = (cleanAddr && authorizedList.includes(cleanAddr)) || (cleanEmail && authorizedList.includes(cleanEmail));
-    const perm = (file.permissions && (file.permissions[cleanAddr] || file.permissions[cleanEmail])) || null;
+    const isAuthorized =
+      (cleanAddr && authorizedList.includes(cleanAddr)) ||
+      (cleanEmail && authorizedList.includes(cleanEmail)) ||
+      (mappedEmail && authorizedList.includes(mappedEmail)) ||
+      (mappedWallet && authorizedList.includes(mappedWallet));
+
+    const perm =
+      (file.permissions &&
+        (file.permissions[cleanAddr] ||
+          file.permissions[cleanEmail] ||
+          file.permissions[mappedEmail] ||
+          file.permissions[mappedWallet])) ||
+      null;
 
     if (isAuthorized && (!perm || perm.isAuthorized !== false)) {
       // Check block timestamp / expiry
