@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { cryptoService, bufferToBase64 } from '../services/cryptoService';
 import { contractService } from '../services/contractService';
 import {
@@ -43,6 +43,7 @@ export const SecureUploadModal = ({
   const [error, setError] = useState(null);
   const [maxLimitMB, setMaxLimitMB] = useState(2048);
   const [uploadedRecord, setUploadedRecord] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Cryptographic audit details
   const [cryptoDetails, setCryptoDetails] = useState({
@@ -266,27 +267,37 @@ distributed IPFS storage and Ethereum smart contract access control.
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
-        
+      <div
+        className="modal-card"
+        style={{
+          maxWidth: '580px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          padding: '1.15rem 1.35rem',
+          borderRadius: '16px',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0, 242, 254, 0.1)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
               background: 'linear-gradient(135deg, rgba(0,242,254,0.2) 0%, rgba(139,92,246,0.2) 100%)',
               color: 'var(--accent-cyan)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <Upload size={18} />
+              <Upload size={16} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.25rem' }}>Secure File Upload Pipeline</h3>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Client-Side AES-256-GCM &bull; SHA-256 &bull; IPFS CID &bull; Smart Contract
+              <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>Secure File Upload Pipeline</h3>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: 0 }}>
+                Client-Side AES-256-GCM &bull; IPFS CID &bull; Smart Contract Access
               </p>
             </div>
           </div>
@@ -298,161 +309,136 @@ distributed IPFS storage and Ethereum smart contract access control.
               border: 'none',
               color: 'var(--text-muted)',
               cursor: 'pointer',
+              padding: '4px',
             }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* File Selection Zone (Only when not finished) */}
         {currentStep < 6 && (
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '0.75rem' }}>
             <div
+              onClick={() => fileInputRef.current?.click()}
               style={{
-                border: '2px dashed rgba(56, 189, 248, 0.35)',
-                borderRadius: 'var(--radius-md)',
-                padding: '1.75rem',
+                border: '1.5px dashed rgba(56, 189, 248, 0.35)',
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
                 textAlign: 'center',
-                background: file ? 'rgba(0, 242, 254, 0.04)' : 'rgba(0,0,0,0.2)',
-                position: 'relative',
+                background: file ? 'rgba(0, 242, 254, 0.05)' : 'rgba(0,0,0,0.25)',
                 cursor: 'pointer',
+                transition: 'all 0.2s ease',
               }}
             >
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".pdf,.docx,.doc,.pptx,.ppt,.png,.jpg,.jpeg,.webp,.zip,.txt,.json,.xlsx"
                 onChange={handleFileChange}
                 disabled={isProcessing}
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  opacity: 0,
-                  cursor: 'pointer',
-                  width: '100%',
-                  height: '100%',
-                }}
+                style={{ display: 'none' }}
               />
 
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.85rem' }}>
                 <div style={{
-                  width: '48px',
-                  height: '48px',
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
-                  background: 'rgba(56, 189, 248, 0.1)',
+                  background: 'rgba(56, 189, 248, 0.12)',
                   color: 'var(--accent-cyan)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  flexShrink: 0,
                 }}>
-                  <FileText size={24} />
+                  <FileText size={18} />
                 </div>
 
-                {file ? (
-                  <div>
-                    <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {file.name}
-                    </p>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {(file.size / (1024 * 1024)).toFixed(2)} MB &bull; {file.type || 'Document'}
-                    </span>
-                  </div>
-                ) : (
-                  <div>
-                    <p style={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                      Drag & Drop file here, or <span style={{ color: 'var(--accent-cyan)' }}>Browse</span>
-                    </p>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Maximum upload size: <strong>{maxLimitMB >= 1024 ? `${(maxLimitMB / 1024).toFixed(1).replace('.0', '')} GB` : `${maxLimitMB} MB`}</strong> (default 2GB)
-                    </span>
-                  </div>
+                <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                  {file ? (
+                    <div>
+                      <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {file.name}
+                      </p>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
+                        {(file.size / (1024 * 1024)).toFixed(2)} MB &bull; {file.type || 'Document'} &bull; Click to change
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <p style={{ fontSize: '0.88rem', fontWeight: 600, margin: 0 }}>
+                        Click to select or drop file here &bull; <span style={{ color: 'var(--accent-cyan)' }}>Browse</span>
+                      </p>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        Default Limit: <strong style={{ color: '#10b981' }}>{maxLimitMB >= 1024 ? `${(maxLimitMB / 1024).toFixed(1).replace('.0', '')} GB` : `${maxLimitMB} MB`}</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {!file && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUseSampleFile();
+                    }}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.72rem', padding: '0.35rem 0.65rem', flexShrink: 0 }}
+                  >
+                    <Sparkles size={11} color="var(--accent-cyan)" />
+                    <span>Sample File</span>
+                  </button>
                 )}
               </div>
             </div>
 
-            {/* 📦 Allowed Formats & Size Controls Info Banner */}
+            {/* Compact Format & Presets Toolbar */}
             <div
               style={{
-                marginTop: '0.75rem',
-                background: 'rgba(0,0,0,0.25)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '10px',
-                padding: '0.75rem 0.9rem',
+                marginTop: '0.45rem',
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: '8px',
+                padding: '0.35rem 0.65rem',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.4rem',
+                fontSize: '0.72rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <ShieldCheck size={14} color="var(--accent-cyan)" />
-                  <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Allowed Formats:
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-                  {['PDF', 'DOCX', 'PPTX', 'PNG', 'JPG', 'ZIP', 'TXT'].map((ext) => (
-                    <span
-                      key={ext}
-                      style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        padding: '0.15rem 0.45rem',
-                        borderRadius: '4px',
-                        background: 'rgba(56, 189, 248, 0.1)',
-                        color: 'var(--accent-cyan)',
-                        border: '1px solid rgba(56, 189, 248, 0.25)',
-                      }}
-                    >
-                      .{ext.toLowerCase()}
-                    </span>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <ShieldCheck size={12} color="var(--accent-cyan)" />
+                <span style={{ color: 'var(--text-muted)' }}>Formats:</span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>PDF, DOCX, PPTX, PNG, JPG, ZIP, TXT</span>
               </div>
 
-              {/* Dynamic Size Limit Customization */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Size Limit: <strong style={{ color: '#10b981' }}>{maxLimitMB >= 1024 ? `${(maxLimitMB / 1024).toFixed(1).replace('.0', '')} GB` : `${maxLimitMB} MB`}</strong> (Default 2GB)
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Adjust Limit:</span>
-                  {[50, 500, 1024, 2048].map((mb) => (
-                    <button
-                      key={mb}
-                      type="button"
-                      onClick={() => handleUpdateLimit(mb)}
-                      style={{
-                        background: maxLimitMB === mb ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${maxLimitMB === mb ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
-                        color: maxLimitMB === mb ? '#34d399' : 'var(--text-muted)',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        padding: '0.15rem 0.45rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {mb >= 1024 ? `${(mb / 1024).toFixed(1).replace('.0', '')} GB` : `${mb} MB`}
-                    </button>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Limit:</span>
+                {[50, 500, 1024, 2048].map((mb) => (
+                  <button
+                    key={mb}
+                    type="button"
+                    onClick={() => handleUpdateLimit(mb)}
+                    style={{
+                      background: maxLimitMB === mb ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${maxLimitMB === mb ? '#10b981' : 'rgba(255,255,255,0.08)'}`,
+                      color: maxLimitMB === mb ? '#34d399' : 'var(--text-muted)',
+                      borderRadius: '4px',
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      padding: '0.1rem 0.35rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {mb >= 1024 ? `${(mb / 1024).toFixed(1).replace('.0', '')} GB` : `${mb} MB`}
+                  </button>
+                ))}
               </div>
             </div>
-
-            {/* Quick 1-Click Sample File */}
-            {!file && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={handleUseSampleFile}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
-                >
-                  <Sparkles size={12} />
-                  <span>Use Sample "Project_Report.pdf"</span>
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -462,32 +448,36 @@ distributed IPFS storage and Ethereum smart contract access control.
             background: 'rgba(244, 63, 94, 0.12)',
             border: '1px solid rgba(244, 63, 94, 0.3)',
             color: '#fb7185',
-            padding: '0.65rem 0.9rem',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.85rem',
-            marginBottom: '1.25rem',
+            padding: '0.55rem 0.8rem',
+            borderRadius: '6px',
+            fontSize: '0.8rem',
+            marginBottom: '0.75rem',
           }}>
             {error}
           </div>
         )}
 
-        {/* 6-Stage Process Pipeline Stepper */}
+        {/* 6-Stage Process Pipeline Stepper (Compact 2-Column Grid) */}
         <div style={{
-          background: 'rgba(0,0,0,0.3)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem',
-          marginBottom: '1.5rem',
+          background: 'rgba(0,0,0,0.25)',
+          borderRadius: '10px',
+          padding: '0.7rem 0.85rem',
+          marginBottom: '0.75rem',
           border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.85rem' }}>
-            Cryptographic Pipeline Steps
-          </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Cryptographic Pipeline Stages
+            </span>
+            <span style={{ fontSize: '0.7rem', color: isProcessing ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>
+              {isProcessing ? '⚡ Executing on blockchain...' : 'Zero-Knowledge Client Encryption'}
+            </span>
+          </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.35rem' }}>
             {STAGES.map((s) => {
               const isCompleted = currentStep > s.id || (currentStep === 6 && cryptoDetails.txHash);
               const isActive = currentStep === s.id && isProcessing;
-              const Icon = s.icon;
 
               return (
                 <div
@@ -496,27 +486,26 @@ distributed IPFS storage and Ethereum smart contract access control.
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0.55rem 0.85rem',
-                    borderRadius: 'var(--radius-sm)',
+                    padding: '0.35rem 0.55rem',
+                    borderRadius: '6px',
                     background: isActive
-                      ? 'rgba(0, 242, 254, 0.1)'
+                      ? 'rgba(0, 242, 254, 0.12)'
                       : isCompleted
                       ? 'rgba(16, 185, 129, 0.08)'
                       : 'rgba(255, 255, 255, 0.02)',
                     border: `1px solid ${
                       isActive
-                        ? 'rgba(0, 242, 254, 0.3)'
+                        ? 'rgba(0, 242, 254, 0.35)'
                         : isCompleted
                         ? 'rgba(16, 185, 129, 0.25)'
                         : 'rgba(255, 255, 255, 0.04)'
                     }`,
-                    transition: 'all 0.25s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', overflow: 'hidden' }}>
                     <div style={{
-                      width: '24px',
-                      height: '24px',
+                      width: '18px',
+                      height: '18px',
                       borderRadius: '50%',
                       background: isCompleted
                         ? 'var(--accent-emerald)'
@@ -527,39 +516,33 @@ distributed IPFS storage and Ethereum smart contract access control.
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      flexShrink: 0,
                     }}>
-                      {isCompleted ? <CheckCircle2 size={16} /> : s.id}
+                      {isCompleted ? <CheckCircle2 size={12} /> : s.id}
                     </div>
 
-                    <div>
-                      <span style={{
-                        fontSize: '0.88rem',
-                        fontWeight: isActive || isCompleted ? 600 : 400,
-                        color: isCompleted ? 'var(--accent-emerald)' : isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                      }}>
-                        {s.label}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                        &bull; {s.desc}
-                      </span>
-                    </div>
+                    <span style={{
+                      fontSize: '0.76rem',
+                      fontWeight: isActive || isCompleted ? 600 : 400,
+                      color: isCompleted ? 'var(--accent-emerald)' : isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {s.label}
+                    </span>
                   </div>
 
-                  <div>
-                    {isCompleted && (
-                      <span className="badge badge-emerald" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                        DONE
-                      </span>
-                    )}
-                    {isActive && (
-                      <span className="badge badge-cyan" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                        <span className="pulse-dot"></span>
-                        RUNNING
-                      </span>
-                    )}
-                  </div>
+                  {isCompleted && (
+                    <span style={{ fontSize: '0.65rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>
+                      ✓
+                    </span>
+                  )}
+                  {isActive && (
+                    <span className="pulse-dot" style={{ width: '6px', height: '6px' }}></span>
+                  )}
                 </div>
               );
             })}
@@ -572,16 +555,16 @@ distributed IPFS storage and Ethereum smart contract access control.
             background: 'rgba(16, 185, 129, 0.06)',
             border: '1px solid rgba(16, 185, 129, 0.25)',
             borderRadius: 'var(--radius-sm)',
-            padding: '1rem',
-            marginBottom: '1.5rem',
-            fontSize: '0.82rem',
+            padding: '0.75rem 0.9rem',
+            marginBottom: '0.75rem',
+            fontSize: '0.78rem',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)', fontWeight: 600, marginBottom: '0.5rem' }}>
-              <ShieldCheck size={16} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)', fontWeight: 600, marginBottom: '0.4rem' }}>
+              <ShieldCheck size={14} />
               <span>Cryptographic Output Details:</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: 'var(--text-muted)' }}>IPFS CID:</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -626,21 +609,21 @@ distributed IPFS storage and Ethereum smart contract access control.
             background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%)',
             border: '1px solid rgba(0, 242, 254, 0.35)',
             borderRadius: 'var(--radius-sm)',
-            padding: '1rem',
-            marginBottom: '1.25rem',
+            padding: '0.75rem 0.9rem',
+            marginBottom: '0.75rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '0.75rem',
+            gap: '0.65rem',
             flexWrap: 'wrap',
           }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontWeight: 700, fontSize: '0.92rem' }}>
-                <Sparkles size={16} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontWeight: 700, fontSize: '0.86rem' }}>
+                <Sparkles size={14} />
                 <span>Encryption & Blockchain Registration Complete!</span>
               </div>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                You can now share this encrypted file directly with team members (Rahul, Priya, Amit) or any EVM wallet.
+              <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                You can now share this encrypted file directly with team members (Rahul, Priya, Amit).
               </p>
             </div>
             <button
@@ -656,28 +639,29 @@ distributed IPFS storage and Ethereum smart contract access control.
                 background: 'linear-gradient(135deg, #00f2fe 0%, #10b981 100%)',
                 color: '#050b14',
                 fontWeight: 700,
-                fontSize: '0.85rem',
-                padding: '0.55rem 1.15rem',
+                fontSize: '0.8rem',
+                padding: '0.45rem 0.9rem',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.45rem',
+                gap: '0.4rem',
                 boxShadow: '0 0 16px rgba(0, 242, 254, 0.4)',
                 cursor: 'pointer',
               }}
             >
-              <Share2 size={16} />
+              <Share2 size={14} />
               <span>Share File Now</span>
             </button>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', alignItems: 'center', marginTop: '0.65rem' }}>
           <button
             type="button"
             className="btn btn-secondary"
             onClick={onClose}
             disabled={isProcessing}
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
           >
             {cryptoDetails.txHash ? 'Done / Go to Vault' : 'Cancel'}
           </button>
@@ -698,13 +682,14 @@ distributed IPFS storage and Ethereum smart contract access control.
                 fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.65rem 1.35rem',
+                gap: '0.45rem',
+                padding: '0.5rem 1.15rem',
+                fontSize: '0.84rem',
                 boxShadow: '0 0 20px rgba(0, 242, 254, 0.45)',
                 cursor: 'pointer',
               }}
             >
-              <Share2 size={16} />
+              <Share2 size={15} />
               <span>Share File (Grant Access) 🚀</span>
             </button>
           ) : (
@@ -713,6 +698,13 @@ distributed IPFS storage and Ethereum smart contract access control.
               className="btn btn-primary"
               onClick={handleStartSecurePipeline}
               disabled={!file || isProcessing}
+              style={{
+                fontSize: '0.84rem',
+                padding: '0.5rem 1.15rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
             >
               {isProcessing ? (
                 <>
@@ -721,7 +713,7 @@ distributed IPFS storage and Ethereum smart contract access control.
                 </>
               ) : (
                 <>
-                  <Upload size={16} />
+                  <Upload size={15} />
                   <span>Encrypt & Upload to IPFS</span>
                 </>
               )}
