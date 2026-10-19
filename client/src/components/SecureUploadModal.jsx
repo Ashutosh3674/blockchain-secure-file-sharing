@@ -16,6 +16,7 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  Share2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -28,12 +29,20 @@ const STAGES = [
   { id: 6, label: 'Store on Blockchain', icon: Blocks, desc: 'Smart contract registry TX' },
 ];
 
-export const SecureUploadModal = ({ isOpen, onClose, activeAddress, onUploadComplete, onShowToast }) => {
+export const SecureUploadModal = ({
+  isOpen,
+  onClose,
+  activeAddress,
+  onUploadComplete,
+  onShareNow,
+  onShowToast,
+}) => {
   const [file, setFile] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [maxLimitMB, setMaxLimitMB] = useState(2048);
+  const [uploadedRecord, setUploadedRecord] = useState(null);
 
   // Cryptographic audit details
   const [cryptoDetails, setCryptoDetails] = useState({
@@ -223,6 +232,7 @@ distributed IPFS storage and Ethereum smart contract access control.
         sha256,
       };
 
+      setUploadedRecord(completeRecord);
       setCryptoDetails((prev) => ({
         ...prev,
         txHash: contractRes.tx.txHash,
@@ -240,7 +250,7 @@ distributed IPFS storage and Ethereum smart contract access control.
       } catch {}
 
       onShowToast(`File "${file.name}" encrypted & registered on blockchain!`);
-      if (onUploadComplete) onUploadComplete(completeRecord);
+      if (onUploadComplete) onUploadComplete(completeRecord, false);
     } catch (err) {
       console.error('Pipeline error:', err);
       setError(err.message || 'Error executing cryptographic pipeline');
@@ -610,18 +620,94 @@ distributed IPFS storage and Ethereum smart contract access control.
           </div>
         )}
 
+        {/* 🎉 File Ready to Share Callout Banner */}
+        {cryptoDetails.txHash && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%)',
+            border: '1px solid rgba(0, 242, 254, 0.35)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '1rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontWeight: 700, fontSize: '0.92rem' }}>
+                <Sparkles size={16} />
+                <span>Encryption & Blockchain Registration Complete!</span>
+              </div>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                You can now share this encrypted file directly with team members (Rahul, Priya, Amit) or any EVM wallet.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                onClose();
+                if (onShareNow && uploadedRecord) {
+                  onShareNow(uploadedRecord);
+                }
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #00f2fe 0%, #10b981 100%)',
+                color: '#050b14',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                padding: '0.55rem 1.15rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 0 16px rgba(0, 242, 254, 0.4)',
+                cursor: 'pointer',
+              }}
+            >
+              <Share2 size={16} />
+              <span>Share File Now</span>
+            </button>
+          </div>
+        )}
+
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', alignItems: 'center' }}>
           <button
             type="button"
             className="btn btn-secondary"
             onClick={onClose}
             disabled={isProcessing}
           >
-            {cryptoDetails.txHash ? 'Close' : 'Cancel'}
+            {cryptoDetails.txHash ? 'Done / Go to Vault' : 'Cancel'}
           </button>
 
-          {!cryptoDetails.txHash && (
+          {cryptoDetails.txHash ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                onClose();
+                if (onShareNow && uploadedRecord) {
+                  onShareNow(uploadedRecord);
+                }
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #00f2fe 0%, #10b981 100%)',
+                color: '#050b14',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.65rem 1.35rem',
+                boxShadow: '0 0 20px rgba(0, 242, 254, 0.45)',
+                cursor: 'pointer',
+              }}
+            >
+              <Share2 size={16} />
+              <span>Share File (Grant Access) 🚀</span>
+            </button>
+          ) : (
             <button
               type="button"
               className="btn btn-primary"

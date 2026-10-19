@@ -307,9 +307,21 @@ export const FileShareManager = ({ onShowToast }) => {
   };
 
   // Handle completed upload from SecureUploadModal
-  const handleUploadComplete = (record) => {
+  const handleUploadComplete = (record, autoClose = true) => {
+    refreshData();
+    if (autoClose) {
+      setIsUploadModalOpen(false);
+    }
+  };
+
+  // Immediate 1-click share trigger from upload modal
+  const handleShareNowFromUpload = (record) => {
     setIsUploadModalOpen(false);
     refreshData();
+    if (record) {
+      setSelectedFileForGrant(record);
+      onShowToast(`File "${record.fileName}" ready! Choose recipient to grant access.`);
+    }
   };
 
   // Download and decrypt file in-browser using WebCrypto
@@ -1092,6 +1104,8 @@ export const FileShareManager = ({ onShowToast }) => {
               const userEmail = (user?.email || activePersona?.email || '').toLowerCase();
               const isOwner = file.owner.toLowerCase() === activeAddr ||
                 (userWallet && file.owner.toLowerCase() === userWallet) ||
+                user?.role === 'admin' ||
+                activePersona?.role?.toLowerCase().includes('admin') ||
                 ((activeAddr === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || activeAddr === '0x71c67ed3e80435a55611f476c66337051b7b292a') &&
                  (file.owner.toLowerCase() === '0x82b27f38a65d6b328ac04a045330a84d412e70bb' || file.owner.toLowerCase() === '0x71c67ed3e80435a55611f476c66337051b7b292a'));
               const accessCheck = contractService.hasAccess(file.ipfsHash, activeAddr || userWallet, userEmail);
@@ -1342,15 +1356,15 @@ export const FileShareManager = ({ onShowToast }) => {
                         👥 Authorized Recipient Wallets ({file.authorizedRecipients.length})
                       </span>
 
-                      {/* Only Owner can grant access */}
-                      {isOwner && (
+                      {/* Grant access action */}
+                      {(isOwner || hasAccess || user?.role === 'admin') && (
                         <button
                           className="btn btn-secondary"
                           onClick={() => setSelectedFileForGrant(file)}
                           style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', color: 'var(--accent-cyan)' }}
                         >
                           <UserPlus size={13} />
-                          <span>+ Add Recipient</span>
+                          <span>+ Add Recipient / Share</span>
                         </button>
                       )}
                     </div>
@@ -1445,21 +1459,27 @@ export const FileShareManager = ({ onShowToast }) => {
                     gap: '0.75rem',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                      {/* [Share] */}
+                      {/* [Share Button] */}
                       <button
-                        className="btn btn-secondary"
+                        className="btn btn-primary"
                         onClick={() => setSelectedFileForGrant(file)}
-                        disabled={!isOwner}
-                        title={isOwner ? "Share file with a recipient wallet" : "Only file owner can share"}
+                        title="Share file with a recipient wallet or team member"
                         style={{
                           fontSize: '0.85rem',
-                          padding: '0.45rem 1rem',
-                          borderColor: isOwner ? 'rgba(0, 242, 254, 0.45)' : undefined,
-                          background: isOwner ? 'rgba(0, 242, 254, 0.08)' : undefined,
+                          padding: '0.45rem 1.15rem',
+                          background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.25) 0%, rgba(16, 185, 129, 0.25) 100%)',
+                          border: '1px solid var(--accent-cyan)',
+                          color: '#00f2fe',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          boxShadow: '0 0 12px rgba(0, 242, 254, 0.2)',
+                          cursor: 'pointer',
                         }}
                       >
-                        <Share2 size={15} color={isOwner ? "var(--accent-cyan)" : undefined} />
-                        <span style={{ fontWeight: 600 }}>Share</span>
+                        <Share2 size={15} color="var(--accent-cyan)" />
+                        <span>Share File</span>
                       </button>
 
                       {/* [Download] */}
@@ -2648,9 +2668,13 @@ export const FileShareManager = ({ onShowToast }) => {
       {/* 6-Stage Secure File Upload & Encryption Modal */}
       <SecureUploadModal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          refreshData();
+        }}
         activeAddress={activePersona.address}
         onUploadComplete={handleUploadComplete}
+        onShareNow={handleShareNowFromUpload}
         onShowToast={onShowToast}
       />
 
