@@ -190,7 +190,8 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
           responseMessage: data.message || 'Blocked by File Whitelist Guard',
         });
       } else if (testType === 'oversized') {
-        // Simulate oversized payload check (> 50MB)
+        // Simulate oversized payload check (> 2GB / 2048MB)
+        const limitMB = window.BLOCKSHARE_UPLOAD_LIMIT_MB || 2048;
         const res = await fetch('/api/files/ipfs-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -198,7 +199,7 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
             ciphertextBase64: 'U2VjdXJlRGF0YQ==',
             fileName: 'large_dataset.zip',
             mimeType: 'application/zip',
-            simulatedBytes: 54 * 1024 * 1024, // 54 MB (> 50 MB limit)
+            simulatedBytes: (limitMB + 100) * 1024 * 1024, // Exceeds active limit (> 2GB)
           }),
         });
         const data = await res.json();
@@ -206,7 +207,7 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
           type: testType,
           status: res.status === 413 ? 'blocked' : 'passed',
           statusCode: res.status,
-          responseMessage: data.message || 'Blocked by 50MB Size Boundary Guard',
+          responseMessage: data.message || 'Blocked by 2GB Size Boundary Guard',
         });
       } else if (testType === 'valid_pptx') {
         // Test valid allowed PPTX file upload
@@ -489,11 +490,11 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
                   </span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  <code>Malicious Input • Whitelist (PDF, DOCX, PPTX, PNG, JPG, ZIP, TXT) • 50MB Limit</code>
+                  <code>Malicious Input • Whitelist (PDF, DOCX, PPTX, PNG, JPG, ZIP, TXT) • 2GB Limit</code>
                   <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.15rem' }}>
                     <li>Whitelists documents (PDF, DOCX, PPTX, TXT), images (PNG, JPG), and archives (ZIP).</li>
                     <li>Bans executable files (.exe, .bat, .sh, .php) with 415 status.</li>
-                    <li>Enforces 50MB upload boundary (configurable dynamically) with early 413 rejection.</li>
+                    <li>Enforces 2GB upload boundary (configurable dynamically) with early 413 rejection.</li>
                     <li>XSS and NoSQL injection sanitizer stripping malicious tokens.</li>
                   </ul>
                 </div>
@@ -837,35 +838,39 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
                     ⚙️ Configurable Maximum Size Boundary:
                   </span>
                   <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    {[25, 50, 100].map((mb) => (
-                      <button
-                        key={mb}
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await fetch('/api/files/upload-limits', {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ maxUploadSizeMB: mb }),
-                            });
-                            window.BLOCKSHARE_UPLOAD_LIMIT_MB = mb;
-                            alert(`Upload limit updated to ${mb} MB`);
-                          } catch {}
-                        }}
-                        style={{
-                          background: mb === 50 ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${mb === 50 ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
-                          color: mb === 50 ? '#34d399' : 'var(--text-muted)',
-                          borderRadius: '4px',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          padding: '0.2rem 0.55rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {mb} MB {mb === 50 ? '(Default)' : ''}
-                      </button>
-                    ))}
+                    {[50, 500, 1024, 2048].map((mb) => {
+                      const isDefault = mb === 2048;
+                      const label = mb >= 1024 ? `${(mb / 1024).toFixed(1).replace('.0', '')} GB` : `${mb} MB`;
+                      return (
+                        <button
+                          key={mb}
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await fetch('/api/files/upload-limits', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ maxUploadSizeMB: mb }),
+                              });
+                              window.BLOCKSHARE_UPLOAD_LIMIT_MB = mb;
+                              alert(`Upload limit updated to ${label}`);
+                            } catch {}
+                          }}
+                          style={{
+                            background: isDefault ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${isDefault ? '#10b981' : 'rgba(255,255,255,0.1)'}`,
+                            color: isDefault ? '#34d399' : 'var(--text-muted)',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            padding: '0.2rem 0.55rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {label} {isDefault ? '(Default 2GB)' : ''}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

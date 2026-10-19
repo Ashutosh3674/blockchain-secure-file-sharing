@@ -82,9 +82,9 @@ app.use(
   })
 );
 
-// Payload size limit (Express body-parser level: 100MB to allow 50MB Base64 ciphertext + metadata)
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+// Payload size limit (Express body-parser level: 3072MB to allow 2GB Base64 ciphertext + metadata)
+app.use(express.json({ limit: '3072mb' }));
+app.use(express.urlencoded({ limit: '3072mb', extended: true }));
 
 // ============================================================================
 // 3. GLOBAL INPUT SANITIZATION
@@ -216,7 +216,7 @@ httpServer.listen(PORT, () => {
   console.log(`🚀 HTTP Server running on http://localhost:${PORT}`);
   console.log(`🛡️  Pillar 1: Password Security with bcrypt (12 rounds) active`);
   console.log(`🎫 Pillar 2: JWT Authentication with 24h Bearer token active`);
-  console.log(`🧱 Pillar 3: Input Validation Firewall (XSS, File Type & 25MB limit) active`);
+  console.log(`🧱 Pillar 3: Input Validation Firewall (XSS, File Type & 2GB limit) active`);
 });
 
 // Start HTTPS Server with Local Development TLS Certificates if available

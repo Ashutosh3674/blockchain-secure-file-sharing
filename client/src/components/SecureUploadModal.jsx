@@ -33,7 +33,7 @@ export const SecureUploadModal = ({ isOpen, onClose, activeAddress, onUploadComp
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
-  const [maxLimitMB, setMaxLimitMB] = useState(50);
+  const [maxLimitMB, setMaxLimitMB] = useState(2048);
 
   // Cryptographic audit details
   const [cryptoDetails, setCryptoDetails] = useState({
@@ -62,13 +62,14 @@ export const SecureUploadModal = ({ isOpen, onClose, activeAddress, onUploadComp
   const handleUpdateLimit = async (newLimit) => {
     setMaxLimitMB(newLimit);
     window.BLOCKSHARE_UPLOAD_LIMIT_MB = newLimit;
+    const label = newLimit >= 1024 ? `${(newLimit / 1024).toFixed(1).replace('.0', '')} GB` : `${newLimit} MB`;
     try {
       await fetch('/api/files/upload-limits', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ maxUploadSizeMB: newLimit }),
       });
-      if (onShowToast) onShowToast(`Upload limit set to ${newLimit} MB`);
+      if (onShowToast) onShowToast(`Upload limit set to ${label}`);
     } catch (e) {
       console.warn('Limit sync notice:', e);
     }
@@ -151,11 +152,12 @@ distributed IPFS storage and Ethereum smart contract access control.
       setCryptoDetails((prev) => ({ ...prev, sha256 }));
       await new Promise((r) => setTimeout(r, 500));
 
-      // Client-Side Pre-Flight Security Validation (50 MB Max & File Whitelist)
-      const MAX_SIZE = (window.BLOCKSHARE_UPLOAD_LIMIT_MB || 50) * 1024 * 1024; // Default 50 MB
+      // Client-Side Pre-Flight Security Validation (2048 MB / 2 GB Default & File Whitelist)
+      const MAX_SIZE = (window.BLOCKSHARE_UPLOAD_LIMIT_MB || 2048) * 1024 * 1024; // Default 2048 MB (2 GB)
       const maxMB = (MAX_SIZE / (1024 * 1024)).toFixed(0);
+      const displayLimit = Number(maxMB) >= 1024 ? `${(Number(maxMB) / 1024).toFixed(1).replace('.0', '')} GB` : `${maxMB} MB`;
       if (file.size > MAX_SIZE) {
-        throw new Error(`File size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds the ${maxMB} MB upload limit. Please select a file under ${maxMB} MB.`);
+        throw new Error(`File size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds the ${displayLimit} upload limit. Please select a file under ${displayLimit}.`);
       }
 
       const fileName = file.name || '';
@@ -350,7 +352,7 @@ distributed IPFS storage and Ethereum smart contract access control.
                       Drag & Drop file here, or <span style={{ color: 'var(--accent-cyan)' }}>Browse</span>
                     </p>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Maximum upload size: <strong>{maxLimitMB} MB</strong> (configurable)
+                      Maximum upload size: <strong>{maxLimitMB >= 1024 ? `${(maxLimitMB / 1024).toFixed(1).replace('.0', '')} GB` : `${maxLimitMB} MB`}</strong> (default 2GB)
                     </span>
                   </div>
                 )}
@@ -400,11 +402,11 @@ distributed IPFS storage and Ethereum smart contract access control.
               {/* Dynamic Size Limit Customization */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Size Limit: <strong style={{ color: '#10b981' }}>{maxLimitMB} MB</strong> (Project Requirement)
+                  Size Limit: <strong style={{ color: '#10b981' }}>{maxLimitMB >= 1024 ? `${(maxLimitMB / 1024).toFixed(1).replace('.0', '')} GB` : `${maxLimitMB} MB`}</strong> (Default 2GB)
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Adjust Limit:</span>
-                  {[25, 50, 100].map((mb) => (
+                  {[50, 500, 1024, 2048].map((mb) => (
                     <button
                       key={mb}
                       type="button"
@@ -420,7 +422,7 @@ distributed IPFS storage and Ethereum smart contract access control.
                         cursor: 'pointer',
                       }}
                     >
-                      {mb} MB
+                      {mb >= 1024 ? `${(mb / 1024).toFixed(1).replace('.0', '')} GB` : `${mb} MB`}
                     </button>
                   ))}
                 </div>

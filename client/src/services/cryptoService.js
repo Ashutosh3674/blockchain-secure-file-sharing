@@ -10,13 +10,14 @@ export const bufferToHex = (buffer) => {
     .join('');
 };
 
-// Helper: Convert ArrayBuffer to Base64
+// Helper: Convert ArrayBuffer to Base64 (Chunked to handle large files up to 2GB without stack overflow)
 export const bufferToBase64 = (buffer) => {
-  let binary = '';
   const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 32768; // 32KB chunking
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode.apply(null, chunk);
   }
   return window.btoa(binary);
 };

@@ -63,9 +63,9 @@ const BANNED_EXTENSIONS = new Set([
   '.app',
 ]);
 
-// Maximum File Upload Size: 50 MB (Configurable dynamically)
-let MAX_UPLOAD_SIZE_MB = parseInt(process.env.MAX_UPLOAD_SIZE_MB || '50', 10);
-let MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024; // Default 50 MB (52,428,800 bytes)
+// Maximum File Upload Size: 2048 MB / 2 GB (Configurable dynamically)
+let MAX_UPLOAD_SIZE_MB = parseInt(process.env.MAX_UPLOAD_SIZE_MB || '2048', 10);
+let MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024; // Default 2048 MB (2 GB / 2,147,483,648 bytes)
 
 const getUploadLimits = () => ({
   maxUploadSizeMB: MAX_UPLOAD_SIZE_MB,
@@ -77,8 +77,8 @@ const getUploadLimits = () => ({
 
 const setUploadLimitMB = (newLimitMB) => {
   const parsed = parseInt(newLimitMB, 10);
-  if (isNaN(parsed) || parsed <= 0 || parsed > 500) {
-    throw new Error('Upload limit must be a positive number between 1 and 500 MB.');
+  if (isNaN(parsed) || parsed <= 0 || parsed > 5000) {
+    throw new Error('Upload limit must be a positive number between 1 and 5000 MB.');
   }
   MAX_UPLOAD_SIZE_MB = parsed;
   MAX_UPLOAD_SIZE_BYTES = parsed * 1024 * 1024;
@@ -244,12 +244,13 @@ const validateUploadSize = (req, res, next) => {
   if (approximateSizeBytes > MAX_UPLOAD_SIZE_BYTES) {
     const sizeMB = (approximateSizeBytes / (1024 * 1024)).toFixed(2);
     const maxMB = (MAX_UPLOAD_SIZE_BYTES / (1024 * 1024)).toFixed(0);
-    console.warn(`🛡️ [Security Firewall] Blocked oversized upload: ${sizeMB} MB exceeds ${maxMB} MB limit.`);
+    const displayLimit = Number(maxMB) >= 1024 ? `${(Number(maxMB) / 1024).toFixed(1).replace('.0', '')} GB (${maxMB} MB)` : `${maxMB} MB`;
+    console.warn(`🛡️ [Security Firewall] Blocked oversized upload: ${sizeMB} MB exceeds ${displayLimit} limit.`);
     return res.status(413).json({
       success: false,
       securityBlocked: true,
       code: 'PAYLOAD_TOO_LARGE',
-      message: `File size (${sizeMB} MB) exceeds the maximum allowed limit of ${maxMB} MB per file.`,
+      message: `File size (${sizeMB} MB) exceeds the maximum allowed limit of ${displayLimit} per file.`,
       maxAllowedBytes: MAX_UPLOAD_SIZE_BYTES,
     });
   }

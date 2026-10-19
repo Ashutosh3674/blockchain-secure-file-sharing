@@ -849,14 +849,14 @@ router.get('/upload-limits', (req, res) => {
       supportedDocuments: ['PDF', 'DOCX', 'PPTX', 'TXT'],
       supportedImages: ['PNG', 'JPG', 'WEBP'],
       supportedArchives: ['ZIP'],
-      maxDefaultMB: 50,
+      maxDefaultMB: 2048,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// @desc    Dynamically update maximum upload size boundary (e.g. 10MB, 25MB, 50MB, 100MB)
+// @desc    Dynamically update maximum upload size boundary (e.g. 50MB, 500MB, 1GB, 2GB, 5GB)
 // @route   PUT /api/files/upload-limits
 // @access  Public / Authenticated
 router.put('/upload-limits', optionalAuth, (req, res) => {
