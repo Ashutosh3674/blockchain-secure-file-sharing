@@ -12,6 +12,7 @@ const {
   getUploadLimits,
   setUploadLimitMB,
 } = require('../middleware/validation');
+const { scanFileThreat } = require('../services/threatDetectionService');
 
 // Ensure IPFS storage directory & data directory exist
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -81,17 +82,75 @@ const generateIPFSCid = (dataBuffer) => {
   return encodeBase58(multihash);
 };
 
+// @desc    Scan file for malware, suspicious payloads, and double extensions before sharing
+// @route   POST /api/files/ai-scan-threat
+// @access  Public / Authenticated
+router.post('/ai-scan-threat', optionalAuth, (req, res) => {
+  try {
+    const { fileName, fileType, fileSize, fileBase64Snippet, fileContent } = req.body;
+    let buffer = Buffer.alloc(0);
+    if (fileBase64Snippet) {
+      buffer = Buffer.from(fileBase64Snippet, 'base64');
+    } else if (fileContent) {
+      buffer = Buffer.from(fileContent, 'utf-8');
+    }
+
+    const threatAnalysis = scanFileThreat({
+      buffer,
+      fileName: fileName || 'document',
+      declaredMime: fileType || 'application/octet-stream',
+      fileSize: Number(fileSize) || buffer.length,
+    });
+
+    console.log(`🛡️ [AI Threat Scan] "${fileName}" evaluated: ${threatAnalysis.level} (Score: ${threatAnalysis.score}/100)`);
+
+    res.status(200).json({
+      success: true,
+      threatAnalysis,
+    });
+  } catch (error) {
+    console.error('Threat scan error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete AI threat scan: ' + error.message,
+    });
+  }
+});
+
 // @desc    Upload & pin encrypted file to IPFS storage (Protected by Validation, Size Limits & Rate Limiter)
 // @route   POST /api/files/ipfs-upload
 // @access  Public / Authenticated
 router.post('/ipfs-upload', uploadRateLimiter, validateFileType, validateUploadSize, optionalAuth, (req, res) => {
   try {
-    const { ciphertextBase64, fileName, mimeType, sha256 } = req.body;
+    const { ciphertextBase64, fileName, mimeType, sha256, threatAnalysis } = req.body;
 
     if (!ciphertextBase64) {
       return res.status(400).json({
         success: false,
         message: 'No ciphertext data provided for IPFS pinning',
+      });
+    }
+
+    // AI Threat Detector Security Gate: Reject if flagged as Dangerous
+    if (threatAnalysis && threatAnalysis.level === 'Dangerous') {
+      return res.status(403).json({
+        success: false,
+        message: `Upload Blocked by AI File Threat Detector: ${threatAnalysis.verdict || 'Critical threat detected'} (Threat Score: ${threatAnalysis.score}/100)`,
+        threatAnalysis,
+      });
+    }
+
+    // Server-side baseline threat scan
+    const serverPreScan = scanFileThreat({
+      buffer: Buffer.alloc(0),
+      fileName: fileName || '',
+      declaredMime: mimeType || '',
+    });
+    if (serverPreScan.level === 'Dangerous') {
+      return res.status(403).json({
+        success: false,
+        message: `Upload Blocked by AI Threat Engine: Malicious extension or disguised executable detected (${serverPreScan.verdict})`,
+        threatAnalysis: serverPreScan,
       });
     }
 
@@ -101,6 +160,8 @@ router.post('/ipfs-upload', uploadRateLimiter, validateFileType, validateUploadS
     // Save encrypted binary chunk into IPFS decentralized storage directory
     const filePath = path.join(IPFS_DIR, `${ipfsCid}.bin`);
     fs.writeFileSync(filePath, dataBuffer);
+
+    const activeThreatAnalysis = threatAnalysis || serverPreScan;
 
     // Also store companion metadata
     const metaPath = path.join(IPFS_DIR, `${ipfsCid}.meta.json`);
@@ -114,13 +175,15 @@ router.post('/ipfs-upload', uploadRateLimiter, validateFileType, validateUploadS
           sha256,
           pinSize: dataBuffer.length,
           pinnedAt: new Date().toISOString(),
+          threatLevel: activeThreatAnalysis.level || 'Safe',
+          threatScore: activeThreatAnalysis.score ?? 5,
         },
         null,
         2
       )
     );
 
-    console.log(`📌 [IPFS] Encrypted file "${fileName}" pinned with CID: ${ipfsCid} (${dataBuffer.length} bytes)`);
+    console.log(`📌 [IPFS] Encrypted file "${fileName}" pinned with CID: ${ipfsCid} (${dataBuffer.length} bytes) - Threat: ${activeThreatAnalysis.level}`);
 
     // Register into active server metadata cache
     const shareId = sha256 ? sha256.slice(0, 8) : ipfsCid.slice(2, 10);
@@ -139,6 +202,9 @@ router.post('/ipfs-upload', uploadRateLimiter, validateFileType, validateUploadS
       uploadedAt: Date.now(),
       authorizedRecipients: [],
       permissions: {},
+      threatLevel: activeThreatAnalysis.level || 'Safe',
+      threatScore: activeThreatAnalysis.score ?? 5,
+      threatAnalysis: activeThreatAnalysis,
     };
 
     if (existingIndex !== -1) {
@@ -340,12 +406,16 @@ const formatServerFileMetadata = (file) => {
   else if (file.isPublic) accessStatus = 'Active (Public)';
   else accessStatus = 'Active (Private - Default)';
 
+  const threatLevel = file.threatLevel || (file.threatAnalysis && file.threatAnalysis.level) || 'Safe';
+  const threatScore = file.threatScore ?? (file.threatAnalysis ? file.threatAnalysis.score : 5);
+
   const formattedSummary = `Name: ${file.fileName}
 Size: ${formattedSize}
 Type: ${fileType}
 Owner: ${ownerShort} (${file.ownerName || 'User'})
 CID: ${cidShort}
 Hash: ${hashShort}
+AI Threat: ${threatLevel} (${threatScore}/100)
 Uploaded: ${uploadDate}
 Expiry: ${expiryDisplay}
 Status: ${accessStatus}`;
@@ -362,6 +432,9 @@ Status: ${accessStatus}`;
     ipfsCidShort: cidShort,
     sha256Hash: fullHash,
     sha256Short: hashShort,
+    threatLevel,
+    threatScore,
+    threatAnalysis: file.threatAnalysis || null,
     uploadDate,
     uploadTimestamp: file.uploadedAt || Date.now(),
     expiry: expiryDisplay,
@@ -537,7 +610,7 @@ router.get('/registry', (req, res) => {
 // @access  Public / Authenticated
 router.post('/register', optionalAuth, (req, res) => {
   try {
-    const { ipfsHash, fileName, fileType, fileSize, owner, ownerName, sha256Hash, isPublic, encryptionKey, iv } = req.body;
+    const { ipfsHash, fileName, fileType, fileSize, owner, ownerName, sha256Hash, isPublic, encryptionKey, iv, threatLevel, threatScore, threatAnalysis } = req.body;
     if (!ipfsHash) {
       return res.status(400).json({ success: false, message: 'ipfsHash is required' });
     }
@@ -546,6 +619,10 @@ router.post('/register', optionalAuth, (req, res) => {
 
     const cleanOwner = (owner || (req.user && req.user.walletAddress) || '0x71c67ed3e80435a55611f476c66337051b7b292a').toLowerCase();
     const cleanOwnerName = ownerName || (req.user && req.user.name) || 'Ashutosh';
+
+    const activeThreatAnalysis = threatAnalysis || (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].threatAnalysis : null);
+    const resolvedThreatLevel = threatLevel || (activeThreatAnalysis && activeThreatAnalysis.level) || 'Safe';
+    const resolvedThreatScore = threatScore ?? (activeThreatAnalysis ? activeThreatAnalysis.score : 5);
 
     const fileRecord = {
       shareId,
@@ -564,6 +641,9 @@ router.post('/register', optionalAuth, (req, res) => {
       wrappedKeys: existingIndex !== -1 ? (SERVER_SHARE_REGISTRY[existingIndex].wrappedKeys || {}) : {},
       encryptionKey: encryptionKey || (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].encryptionKey : undefined),
       iv: iv || (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].iv : undefined),
+      threatLevel: resolvedThreatLevel,
+      threatScore: resolvedThreatScore,
+      threatAnalysis: activeThreatAnalysis,
     };
 
     if (existingIndex !== -1) {

@@ -1,6 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { cryptoService, bufferToBase64 } from '../services/cryptoService';
 import { contractService } from '../services/contractService';
+import { performAIThreatScan } from '../services/aiThreatScanner';
+import { AIThreatScannerCard } from './AIThreatScannerCard';
 import {
   X,
   Upload,
@@ -16,6 +18,8 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
   Share2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -43,6 +47,9 @@ export const SecureUploadModal = ({
   const [error, setError] = useState(null);
   const [maxLimitMB, setMaxLimitMB] = useState(2048);
   const [uploadedRecord, setUploadedRecord] = useState(null);
+  const [threatAnalysis, setThreatAnalysis] = useState(null);
+  const [isScanningThreat, setIsScanningThreat] = useState(false);
+  const [warningAcknowledged, setWarningAcknowledged] = useState(false);
   const fileInputRef = useRef(null);
 
   // Cryptographic audit details
@@ -53,6 +60,34 @@ export const SecureUploadModal = ({
     ipfsCid: null,
     txHash: null,
   });
+
+  // Automatically trigger AI Threat Scan when file selection changes
+  useEffect(() => {
+    if (file) {
+      let isCurrent = true;
+      setIsScanningThreat(true);
+      setWarningAcknowledged(false);
+      performAIThreatScan(file)
+        .then((analysis) => {
+          if (isCurrent) {
+            setThreatAnalysis(analysis);
+            setIsScanningThreat(false);
+          }
+        })
+        .catch((err) => {
+          if (isCurrent) {
+            console.warn('AI Threat Scan failed:', err);
+            setIsScanningThreat(false);
+          }
+        });
+      return () => {
+        isCurrent = false;
+      };
+    } else {
+      setThreatAnalysis(null);
+      setWarningAcknowledged(false);
+    }
+  }, [file]);
 
   // Fetch active upload limit configuration
   React.useEffect(() => {
@@ -125,10 +160,38 @@ distributed IPFS storage and Ethereum smart contract access control.
     }
   };
 
+  const handleApplyPreset = (type) => {
+    if (type === 'safe') {
+      handleUseSampleFile();
+    } else if (type === 'warning') {
+      const warningContent = `%PDF-1.4\n<script>alert("macro warning")</script>\nAutoOpen Macro payload detected.\nvbaProject.bin reference embedded.`;
+      const blob = new Blob([warningContent], { type: 'application/pdf' });
+      const sampleFile = new File([blob], 'Confidential_Invoice_Macro.pdf', { type: 'application/pdf' });
+      setFile(sampleFile);
+      setError(null);
+    } else if (type === 'dangerous') {
+      const malwareContent = `MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xFF\xFF\x00\x00powershell.exe -enc IEX(New-Object Net.WebClient).DownloadString()`;
+      const blob = new Blob([malwareContent], { type: 'application/octet-stream' });
+      const sampleFile = new File([blob], 'Critical_Security_Patch.pdf.exe', { type: 'application/octet-stream' });
+      setFile(sampleFile);
+      setError(null);
+    }
+  };
+
   // Execute the Complete 6-Step Secure Upload Pipeline
   const handleStartSecurePipeline = async () => {
     if (!file) {
       setError('Please select a file first.');
+      return;
+    }
+
+    if (threatAnalysis?.level === 'Dangerous') {
+      setError(`Security Block: AI File Threat Detector identified this file as DANGEROUS (Score: ${threatAnalysis.score}/100). Malicious content cannot be uploaded or shared on decentralized storage.`);
+      return;
+    }
+
+    if (threatAnalysis?.level === 'Warning' && !warningAcknowledged) {
+      setError('Security Notice: Please review and check the security acknowledgment box before proceeding with this file.');
       return;
     }
 
@@ -200,6 +263,7 @@ distributed IPFS storage and Ethereum smart contract access control.
           fileName: file.name,
           mimeType: file.type || 'application/pdf',
           sha256,
+          threatAnalysis,
         }),
       });
 
@@ -222,7 +286,8 @@ distributed IPFS storage and Ethereum smart contract access control.
         activeAddress,
         sha256,
         exportedKey,
-        encryptionResult.iv
+        encryptionResult.iv,
+        threatAnalysis
       );
 
       // Also attach secret key to local cache so owner/authorized users can decrypt it
@@ -231,6 +296,9 @@ distributed IPFS storage and Ethereum smart contract access control.
         encryptionKey: exportedKey,
         iv: encryptionResult.iv,
         sha256,
+        threatAnalysis,
+        threatLevel: threatAnalysis?.level || 'Safe',
+        threatScore: threatAnalysis?.score ?? 5,
       };
 
       setUploadedRecord(completeRecord);
@@ -439,6 +507,47 @@ distributed IPFS storage and Ethereum smart contract access control.
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* AI Threat Scanner Card (Real-time Malware & Payload Inspection) */}
+        {currentStep < 6 && (file || isScanningThreat) && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <AIThreatScannerCard
+              threatAnalysis={threatAnalysis}
+              isScanning={isScanningThreat}
+              fileName={file?.name}
+              onApplyPreset={handleApplyPreset}
+            />
+          </div>
+        )}
+
+        {/* Warning Acknowledgment Checkbox if level === 'Warning' */}
+        {currentStep < 6 && threatAnalysis?.level === 'Warning' && (
+          <div
+            style={{
+              marginBottom: '0.75rem',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '8px',
+              padding: '0.55rem 0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.55rem',
+              fontSize: '0.76rem',
+              color: '#fde68a',
+            }}
+          >
+            <input
+              type="checkbox"
+              id="warningAck"
+              checked={warningAcknowledged}
+              onChange={(e) => setWarningAcknowledged(e.target.checked)}
+              style={{ accentColor: '#f59e0b', cursor: 'pointer', width: '15px', height: '15px' }}
+            />
+            <label htmlFor="warningAck" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+              Security Acknowledgment: I have reviewed the detected macro/script indicators and verify this file is safe to share.
+            </label>
           </div>
         )}
 
@@ -692,18 +801,39 @@ distributed IPFS storage and Ethereum smart contract access control.
               <Share2 size={15} />
               <span>Share File (Grant Access) 🚀</span>
             </button>
-          ) : (
+          ) : threatAnalysis?.level === 'Dangerous' ? (
             <button
               type="button"
-              className="btn btn-primary"
-              onClick={handleStartSecurePipeline}
-              disabled={!file || isProcessing}
+              className="btn btn-secondary"
+              disabled
               style={{
                 fontSize: '0.84rem',
                 padding: '0.5rem 1.15rem',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
+                background: 'rgba(239, 68, 68, 0.18)',
+                border: '1px solid rgba(239, 68, 68, 0.5)',
+                color: '#fca5a5',
+                cursor: 'not-allowed',
+              }}
+            >
+              <ShieldAlert size={15} color="#ef4444" />
+              <span>Blocked: Dangerous Threat ({threatAnalysis.score}/100)</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleStartSecurePipeline}
+              disabled={!file || isProcessing || (threatAnalysis?.level === 'Warning' && !warningAcknowledged)}
+              style={{
+                fontSize: '0.84rem',
+                padding: '0.5rem 1.15rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                opacity: (threatAnalysis?.level === 'Warning' && !warningAcknowledged) ? 0.6 : 1,
               }}
             >
               {isProcessing ? (
@@ -714,7 +844,11 @@ distributed IPFS storage and Ethereum smart contract access control.
               ) : (
                 <>
                   <Upload size={15} />
-                  <span>Encrypt & Upload to IPFS</span>
+                  <span>
+                    {threatAnalysis?.level === 'Warning' && !warningAcknowledged
+                      ? 'Acknowledge Threat Warning'
+                      : 'Encrypt & Upload to IPFS'}
+                  </span>
                 </>
               )}
             </button>

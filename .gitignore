@@ -33,4 +33,11 @@ Thumbs.db
 
 # Local database data & uploads
 server/uploads/
+server/data/ipfs_storage/
+scratch/extracted_images/
+scratch/__pycache__/
+__pycache__/
+*.pdf
+scratch/*.html
+scratch/*.py
 scratch/temp/

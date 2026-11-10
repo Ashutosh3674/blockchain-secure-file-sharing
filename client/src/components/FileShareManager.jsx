@@ -37,6 +37,7 @@ import {
   Trash2,
   Info,
   Link2,
+  Cpu,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SecureUploadModal } from './SecureUploadModal';
@@ -44,6 +45,7 @@ import { SecureLinkModal } from './SecureLinkModal';
 import { FileDeleteModal } from './FileDeleteModal';
 import { FileMetadataModal } from './FileMetadataModal';
 import { TransactionDetailsModal } from './TransactionDetailsModal';
+import { AIThreatScannerModal } from './AIThreatScannerModal';
 import { cryptoService } from '../services/cryptoService';
 import { keyManagementService } from '../services/keyManagementService';
 
@@ -156,6 +158,10 @@ export const FileShareManager = ({ onShowToast }) => {
   // Secure Upload modal state
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('files'); // 'files' | 'shared_with_me' | 'logs' | 'keys'
+
+  // AI File Threat Detector Modal State
+  const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
+  const [selectedThreatFile, setSelectedThreatFile] = useState(null);
 
   // Blockchain Transaction Details Modal State
   const [selectedTxHash, setSelectedTxHash] = useState('');
@@ -830,16 +836,42 @@ export const FileShareManager = ({ onShowToast }) => {
           </button>
         </div>
 
-        {activeTab === 'files' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <button
-            className="btn btn-primary"
-            onClick={() => setIsUploadModalOpen(true)}
-            style={{ fontSize: '0.88rem', padding: '0.55rem 1.25rem' }}
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setSelectedThreatFile(null);
+              setIsThreatModalOpen(true);
+            }}
+            style={{
+              fontSize: '0.86rem',
+              padding: '0.52rem 1rem',
+              borderColor: 'rgba(0, 242, 254, 0.45)',
+              color: 'var(--accent-cyan)',
+              background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(139, 92, 246, 0.1) 100%)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 600,
+            }}
+            title="Scan any file with AI Threat Intelligence before sharing"
           >
-            <Plus size={16} />
-            <span>+ Upload File</span>
+            <Cpu size={15} color="var(--accent-cyan)" />
+            <span>AI Threat Scanner</span>
           </button>
-        )}
+
+          {activeTab === 'files' && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsUploadModalOpen(true)}
+              style={{ fontSize: '0.88rem', padding: '0.55rem 1.25rem' }}
+            >
+              <Plus size={16} />
+              <span>+ Upload File</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tab 1: Files Registry - MY FILES View */}
@@ -1200,6 +1232,41 @@ export const FileShareManager = ({ onShowToast }) => {
                               Active
                             </span>
                           )}
+
+                          {/* AI Threat Score Badge (Safe / Warning / Dangerous) */}
+                          <span
+                            className={`badge ${
+                              (file.threatLevel || 'Safe') === 'Dangerous'
+                                ? 'badge-rose'
+                                : (file.threatLevel || 'Safe') === 'Warning'
+                                ? 'badge-amber'
+                                : 'badge-emerald'
+                            }`}
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '0.2rem 0.6rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              cursor: 'pointer',
+                              border: `1px solid ${
+                                (file.threatLevel || 'Safe') === 'Dangerous'
+                                  ? 'rgba(239, 68, 68, 0.4)'
+                                  : (file.threatLevel || 'Safe') === 'Warning'
+                                  ? 'rgba(245, 158, 11, 0.4)'
+                                  : 'rgba(16, 185, 129, 0.4)'
+                              }`,
+                            }}
+                            title="Click to view AI File Threat Intelligence Report"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedThreatFile(file);
+                              setIsThreatModalOpen(true);
+                            }}
+                          >
+                            <ShieldCheck size={12} />
+                            AI Threat: {file.threatLevel || 'Safe'} ({file.threatScore ?? 5}/100)
+                          </span>
 
                           {/* Sharing Mode Badge: Private (Default) vs Public */}
                           {file.isPublic ? (
@@ -1737,9 +1804,33 @@ export const FileShareManager = ({ onShowToast }) => {
                               )}
                             </div>
                             <div>
-                              <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'block', fontSize: '0.92rem' }}>
-                                {file.fileName}
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.92rem' }}>
+                                  {file.fileName}
+                                </span>
+                                <span
+                                  className={`badge ${
+                                    (file.threatLevel || 'Safe') === 'Dangerous'
+                                      ? 'badge-rose'
+                                      : (file.threatLevel || 'Safe') === 'Warning'
+                                      ? 'badge-amber'
+                                      : 'badge-emerald'
+                                  }`}
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    padding: '0.1rem 0.45rem',
+                                    cursor: 'pointer',
+                                  }}
+                                  title="View AI Threat Report"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedThreatFile(file);
+                                    setIsThreatModalOpen(true);
+                                  }}
+                                >
+                                  {file.threatLevel || 'Safe'} ({file.threatScore ?? 5})
+                                </span>
+                              </div>
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                                 {(file.fileSize / (1024 * 1024)).toFixed(2)} MB &bull; <code className="mono" style={{ color: 'var(--accent-cyan)' }}>{truncate(file.ipfsHash)}</code>
                               </span>
@@ -2695,6 +2786,17 @@ export const FileShareManager = ({ onShowToast }) => {
         isOpen={isTxDetailsOpen}
         initialTxHash={selectedTxHash}
         onClose={() => setIsTxDetailsOpen(false)}
+        onShowToast={onShowToast}
+      />
+
+      {/* 🤖 AI File Threat Detector Modal */}
+      <AIThreatScannerModal
+        isOpen={isThreatModalOpen}
+        initialFile={selectedThreatFile}
+        onClose={() => {
+          setIsThreatModalOpen(false);
+          setSelectedThreatFile(null);
+        }}
         onShowToast={onShowToast}
       />
 

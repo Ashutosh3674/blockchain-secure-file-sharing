@@ -19,13 +19,23 @@ import {
   Server,
   FileText,
   FileCode,
+  Cpu,
+  Sparkles,
+  FileSearch,
 } from 'lucide-react';
+import { AIThreatScannerCard } from './AIThreatScannerCard';
+import { performAIThreatScan } from '../services/aiThreatScanner';
 
 export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
   if (!isOpen) return null;
 
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'password' | 'jwt' | 'https' | 'validation'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ai_threat' | 'password' | 'jwt' | 'https' | 'validation'
   
+  // AI Threat Detector Lab State
+  const [aiTestFile, setAiTestFile] = useState(null);
+  const [aiThreatAnalysis, setAiThreatAnalysis] = useState(null);
+  const [isAiScanning, setIsAiScanning] = useState(false);
+
   // Password Lab State
   const [testPassword, setTestPassword] = useState('SecurePass2026!#');
   const [copiedHash, setCopiedHash] = useState(false);
@@ -47,6 +57,30 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
     statusCode: null,
     responseMessage: null,
   });
+
+  const handleRunAiDemo = async (type) => {
+    setIsAiScanning(true);
+    let f;
+    if (type === 'safe') {
+      const blob = new Blob(['%PDF-1.4\nAcademic Research Paper: Quantum-Resistant Blockchain File Sharing\nAuthor: Ashutosh\nZero malware.'], { type: 'application/pdf' });
+      f = new File([blob], 'Research_Paper_2026.pdf', { type: 'application/pdf' });
+    } else if (type === 'warning') {
+      const blob = new Blob(['%PDF-1.4\n<script>eval(unescape("%75%6E..."))</script>\nAutoOpen Macro payload detected.'], { type: 'application/pdf' });
+      f = new File([blob], 'Quarterly_Balance_Macro.pdf', { type: 'application/pdf' });
+    } else {
+      const blob = new Blob(['MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00powershell.exe -enc IEX(New-Object Net.WebClient).DownloadString()'], { type: 'application/octet-stream' });
+      f = new File([blob], 'Confidential_Employee_Bonus.pdf.exe', { type: 'application/octet-stream' });
+    }
+    setAiTestFile(f);
+    try {
+      const res = await performAIThreatScan(f);
+      setAiThreatAnalysis(res);
+    } catch (e) {
+      console.warn('AI scan error:', e);
+    } finally {
+      setIsAiScanning(false);
+    }
+  };
 
   useEffect(() => {
     fetchSecurityStatus();
@@ -353,6 +387,7 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
         >
           {[
             { id: 'overview', label: '🛡️ 4 Pillars Overview', icon: Shield },
+            { id: 'ai_threat', label: '🤖 AI Threat Detector', icon: Cpu },
             { id: 'password', label: '🔑 Password & bcrypt', icon: Lock },
             { id: 'jwt', label: '🎫 JWT Authentication', icon: Key },
             { id: 'https', label: '🌐 HTTPS & Headers', icon: Globe },
@@ -362,7 +397,12 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (tab.id === 'ai_threat' && !aiThreatAnalysis) {
+                    handleRunAiDemo('safe');
+                  }
+                }}
                 className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
                 style={{
                   fontSize: '0.82rem',
@@ -375,6 +415,137 @@ export const SecurityCenterModal = ({ isOpen, onClose, onShowToast }) => {
             );
           })}
         </div>
+
+        {/* TAB: AI THREAT DETECTOR */}
+        {activeTab === 'ai_threat' && (
+          <div>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                border: '1px solid rgba(0, 242, 254, 0.3)',
+                borderRadius: '12px',
+                padding: '1.25rem',
+                marginBottom: '1.25rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '10px',
+                      background: 'rgba(0, 242, 254, 0.15)',
+                      color: 'var(--accent-cyan)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Cpu size={22} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>AI File Threat Detector Lab</h4>
+                      <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>AI Detection 2026</span>
+                    </div>
+                    <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Scans files for malware, suspicious payloads, double extensions &amp; assigns Safe, Warning, or Dangerous threat scores.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 1-Click Interactive Demos */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Simulate Threat:</span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleRunAiDemo('safe')}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.3rem 0.65rem',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      borderColor: 'rgba(16, 185, 129, 0.4)',
+                      color: '#34d399',
+                    }}
+                  >
+                    🟢 Safe File (Score 5)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleRunAiDemo('warning')}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.3rem 0.65rem',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      borderColor: 'rgba(245, 158, 11, 0.4)',
+                      color: '#fbbf24',
+                    }}
+                  >
+                    🟡 Suspicious Script (Score 50)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleRunAiDemo('dangerous')}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.3rem 0.65rem',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      borderColor: 'rgba(239, 68, 68, 0.4)',
+                      color: '#f87171',
+                    }}
+                  >
+                    🔴 Trojan Disguise (Score 90)
+                  </button>
+                </div>
+              </div>
+
+              {/* Threat Result Card */}
+              <AIThreatScannerCard
+                threatAnalysis={aiThreatAnalysis}
+                isScanning={isAiScanning}
+                fileName={aiTestFile?.name}
+                onApplyPreset={handleRunAiDemo}
+              />
+            </div>
+
+            {/* Architecture Details Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <ShieldCheck size={16} color="#10b981" />
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>1. Safe Score (0 - 29)</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Magic bytes match declared MIME type. Shannon entropy is normal. No malicious shellcode or scripts. Certified for zero-knowledge AES-256 encryption &amp; IPFS storage.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <AlertTriangle size={16} color="#f59e0b" />
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>2. Warning Score (30 - 69)</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Document contains embedded VBA macros (`AutoOpen`), non-standard PDF `/Launch` streams, or script tags. Requires explicit user acknowledgment before sharing.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <ShieldAlert size={16} color="#ef4444" />
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>3. Dangerous Score (70 - 100)</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Double extensions (`.pdf.exe`), PE `MZ` binary headers masquerading as documents, RLO characters, or reverse shells. <strong>Sharing is strictly blocked</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (

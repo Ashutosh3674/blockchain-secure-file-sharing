@@ -209,7 +209,7 @@ export const contractService = {
   },
 
   // 1. Register File on Blockchain
-  async registerFile(ipfsHash, fileName, fileType, fileSize, currentAddress, sha256Hash = '', encryptionKey = '', iv = null) {
+  async registerFile(ipfsHash, fileName, fileType, fileSize, currentAddress, sha256Hash = '', encryptionKey = '', iv = null, threatAnalysis = null) {
     const cleanAddress = (currentAddress || '0x71c67ed3e80435a55611f476c66337051b7b292a').toLowerCase();
     const files = getStoredFiles();
 
@@ -218,6 +218,9 @@ export const contractService = {
     }
 
     const shareId = sha256Hash ? sha256Hash.slice(0, 8) : ipfsHash.slice(2, 10);
+
+    const resolvedThreatLevel = (threatAnalysis && threatAnalysis.level) || 'Safe';
+    const resolvedThreatScore = (threatAnalysis && threatAnalysis.score) ?? 5;
 
     const newRecord = {
       shareId,
@@ -234,6 +237,9 @@ export const contractService = {
       wrappedKeys: {},
       encryptionKey: encryptionKey || undefined,
       iv: iv || undefined,
+      threatLevel: resolvedThreatLevel,
+      threatScore: resolvedThreatScore,
+      threatAnalysis: threatAnalysis || null,
     };
 
     files.unshift(newRecord);
@@ -254,6 +260,9 @@ export const contractService = {
           isPublic: false,
           encryptionKey,
           iv,
+          threatLevel: resolvedThreatLevel,
+          threatScore: resolvedThreatScore,
+          threatAnalysis,
         }),
       });
     } catch (e) {

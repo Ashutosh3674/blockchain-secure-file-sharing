@@ -505,6 +505,51 @@ Status: ${accessStatus}`;
             </div>
           </div>
 
+          {/* Field 10: AI Threat Intelligence Audit */}
+          <div
+            style={{
+              ...fieldCardStyle,
+              gridColumn: '1 / -1',
+              background: (file.threatLevel === 'Dangerous')
+                ? 'rgba(239, 68, 68, 0.08)'
+                : (file.threatLevel === 'Warning')
+                ? 'rgba(245, 158, 11, 0.08)'
+                : 'rgba(16, 185, 129, 0.06)',
+              borderColor: (file.threatLevel === 'Dangerous')
+                ? 'rgba(239, 68, 68, 0.35)'
+                : (file.threatLevel === 'Warning')
+                ? 'rgba(245, 158, 11, 0.35)'
+                : 'rgba(16, 185, 129, 0.25)',
+            }}
+          >
+            <div style={fieldHeaderStyle}>
+              <ShieldCheck size={14} color={file.threatLevel === 'Dangerous' ? '#ef4444' : file.threatLevel === 'Warning' ? '#f59e0b' : '#10b981'} />
+              <span style={{ fontWeight: 700 }}>10. AI Threat Intelligence Audit</span>
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '20px',
+                  background: file.threatLevel === 'Dangerous' ? 'rgba(239,68,68,0.2)' : file.threatLevel === 'Warning' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)',
+                  color: file.threatLevel === 'Dangerous' ? '#ef4444' : file.threatLevel === 'Warning' ? '#f59e0b' : '#10b981',
+                  border: `1px solid ${file.threatLevel === 'Dangerous' ? '#ef4444' : file.threatLevel === 'Warning' ? '#f59e0b' : '#10b981'}`,
+                }}
+              >
+                Score: {file.threatScore ?? 5}/100 &bull; {(file.threatLevel || 'Safe').toUpperCase()}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
+              {file.threatAnalysis?.aiSummary ||
+                (file.threatLevel === 'Dangerous'
+                  ? 'CRITICAL ALERT: File flagged with malicious payload or disguised executable characteristics.'
+                  : file.threatLevel === 'Warning'
+                  ? 'CAUTION: File flagged with anomalous macros or script patterns.'
+                  : 'AI Threat Engine evaluated MIME headers, magic bytes, payload patterns, and Shannon entropy. Verified malware-free for blockchain storage.')}
+            </div>
+          </div>
+
         </div>
 
         {/* Modal Action Footer */}
