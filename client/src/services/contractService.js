@@ -164,6 +164,12 @@ export const contractService = {
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.files)) {
+          // If central server vault was cleared/emptied, propagate empty state to browser
+          if (data.files.length === 0) {
+            saveStoredFiles([]);
+            return [];
+          }
+
           const localFiles = getStoredFiles();
           const map = new Map();
           // Seed with local files
@@ -802,6 +808,15 @@ export const contractService = {
           'Local gateway pin removed and keys destroyed. External distributed IPFS copies are rendered permanently undecryptable.',
       },
     };
+  },
+
+  // 5c. Clear Entire Vault (Files & IPFS chunks)
+  async clearAllFiles() {
+    saveStoredFiles([]);
+    saveStoredLogs([]);
+    try {
+      await fetch('/api/files/clear-vault', { method: 'POST' });
+    } catch (e) {}
   },
 
   // 6. Multi-Barrier Verification Pipeline for Secure Sharing Links

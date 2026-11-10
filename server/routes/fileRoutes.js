@@ -117,6 +117,33 @@ router.post('/ai-scan-threat', optionalAuth, (req, res) => {
   }
 });
 
+// @desc    Clear all uploaded files and IPFS storage (Keeps user accounts intact)
+// @route   POST /api/files/clear-vault
+// @access  Public / Authenticated
+router.post('/clear-vault', optionalAuth, (req, res) => {
+  try {
+    SERVER_SHARE_REGISTRY = [];
+    saveServerFiles([]);
+
+    if (fs.existsSync(IPFS_DIR)) {
+      const items = fs.readdirSync(IPFS_DIR);
+      for (const item of items) {
+        try {
+          fs.unlinkSync(path.join(IPFS_DIR, item));
+        } catch (e) {}
+      }
+    }
+
+    console.log('🗑️ [Vault Cleared] All uploaded files and IPFS chunks have been cleared.');
+    res.status(200).json({
+      success: true,
+      message: 'All uploaded files and IPFS storage cleared successfully.',
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // @desc    Upload & pin encrypted file to IPFS storage (Protected by Validation, Size Limits & Rate Limiter)
 // @route   POST /api/files/ipfs-upload
 // @access  Public / Authenticated
