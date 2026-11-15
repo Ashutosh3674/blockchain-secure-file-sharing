@@ -45,6 +45,9 @@ export const SecureShareView = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadStep, setDownloadStep] = useState('idle');
   const [copied, setCopied] = useState(false);
+  const [enteredPassword, setEnteredPassword] = useState('');
+  const [isPasswordUnlocked, setIsPasswordUnlocked] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   // Available test personas for 1-click switching
   const TEST_PERSONAS = [
@@ -665,36 +668,119 @@ export const SecureShareView = ({
 
           {/* Action button: Download when ALLOW, or Remediation when DENY */}
           {pipeline?.isAllowed ? (
-            <button
-              className="btn btn-primary"
-              onClick={handleDownloadAndDecrypt}
-              disabled={isDownloading}
-              style={{
-                fontSize: '0.95rem',
-                padding: '0.7rem 1.6rem',
-                background: 'linear-gradient(135deg, var(--accent-emerald) 0%, #059669 100%)',
-                borderColor: 'var(--accent-emerald)',
-                boxShadow: '0 0 20px rgba(16, 185, 129, 0.35)',
-              }}
-            >
-              {isDownloading ? (
-                <>
-                  <div className="pulse-dot" style={{ width: '12px', height: '12px', background: '#fff' }}></div>
-                  <span>
-                    {downloadStep === 'ipfs' && 'Fetching IPFS Ciphertext...'}
-                    {downloadStep === 'key' && 'Unwrapping AES-256 Key...'}
-                    {downloadStep === 'decrypting' && 'Decrypting File...'}
-                    {downloadStep === 'recording' && 'Incrementing Ledger...'}
-                    {downloadStep === 'done' && 'Downloaded!'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Download size={18} />
-                  <span>Decrypt & Download File</span>
-                </>
-              )}
-            </button>
+            (() => {
+              const fileNeedsPassword = (file?.hasPassword || file?.linkPassword) && 
+                file?.owner?.toLowerCase() !== (account || '').toLowerCase() && 
+                !isPasswordUnlocked;
+
+              if (fileNeedsPassword) {
+                return (
+                  <div style={{
+                    background: 'rgba(0,0,0,0.4)',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    borderRadius: '10px',
+                    padding: '0.85rem 1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                    maxWidth: '340px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f59e0b', fontSize: '0.82rem', fontWeight: 600 }}>
+                      <Lock size={14} />
+                      <span>Password Required by Owner</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <input
+                        type="password"
+                        placeholder="Enter link password..."
+                        value={enteredPassword}
+                        onChange={(e) => {
+                          setEnteredPassword(e.target.value);
+                          setPasswordError('');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0.4rem 0.6rem',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          background: 'rgba(255,255,255,0.05)',
+                          color: '#fff',
+                          fontSize: '0.8rem',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={async () => {
+                          const candidate = enteredPassword.trim();
+                          if (!candidate) {
+                            setPasswordError('Please enter password');
+                            return;
+                          }
+                          try {
+                            const verifyRes = await contractService.verifyFilePassword(file.ipfsHash, candidate);
+                            if (verifyRes.valid) {
+                              setIsPasswordUnlocked(true);
+                              setPasswordError('');
+                              onShowToast('Passcode verified! Decryption unlocked.');
+                            } else {
+                              setPasswordError('Invalid passcode. Access denied.');
+                            }
+                          } catch (e) {
+                            if (candidate === file.linkPassword) {
+                              setIsPasswordUnlocked(true);
+                              setPasswordError('');
+                              onShowToast('Passcode verified! Decryption unlocked.');
+                            } else {
+                              setPasswordError('Incorrect passcode.');
+                            }
+                          }
+                        }}
+                        style={{ fontSize: '0.78rem', padding: '0.4rem 0.8rem' }}
+                      >
+                        Unlock
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <span style={{ fontSize: '0.72rem', color: '#f87171' }}>{passwordError}</span>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleDownloadAndDecrypt}
+                  disabled={isDownloading}
+                  style={{
+                    fontSize: '0.95rem',
+                    padding: '0.7rem 1.6rem',
+                    background: 'linear-gradient(135deg, var(--accent-emerald) 0%, #059669 100%)',
+                    borderColor: 'var(--accent-emerald)',
+                    boxShadow: '0 0 20px rgba(16, 185, 129, 0.35)',
+                  }}
+                >
+                  {isDownloading ? (
+                    <>
+                      <div className="pulse-dot" style={{ width: '12px', height: '12px', background: '#fff' }}></div>
+                      <span>
+                        {downloadStep === 'ipfs' && 'Fetching IPFS Ciphertext...'}
+                        {downloadStep === 'key' && 'Unwrapping AES-256 Key...'}
+                        {downloadStep === 'decrypting' && 'Decrypting File...'}
+                        {downloadStep === 'recording' && 'Incrementing Ledger...'}
+                        {downloadStep === 'done' && 'Downloaded!'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} />
+                      <span>Decrypt & Download File</span>
+                    </>
+                  )}
+                </button>
+              );
+            })()
           ) : (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {!isAuthenticated && onOpenAuth && (

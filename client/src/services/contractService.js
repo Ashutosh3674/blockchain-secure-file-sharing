@@ -22,6 +22,41 @@ export const FILE_ACCESS_CONTROL_ABI = [
 // In-Memory & LocalStorage Persistent Blockchain State
 const STORAGE_KEY_FILES = 'blockshare_chain_files_v5';
 const STORAGE_KEY_LOGS = 'blockshare_chain_logs_v3';
+const STORAGE_KEY_FOLDERS = 'blockshare_folders_v1';
+const STORAGE_KEY_PLAN = 'blockshare_storage_plan_v1';
+
+export const STORAGE_PLANS = [
+  { id: 'starter', name: 'Free Starter Plan', quotaGB: 10, quotaBytes: 10 * 1024 * 1024 * 1024, price: 'Free', features: ['10 GB Decentr. Storage', 'Up to 2 GB per file upload', 'Zero-knowledge AES-256 encryption', 'Public & Private link sharing'] },
+  { id: 'pro', name: 'Web3 Pro Tier', quotaGB: 100, quotaBytes: 100 * 1024 * 1024 * 1024, price: '$9.99 / mo', badge: 'Popular', features: ['100 GB High-Speed IPFS', 'Up to 5 GB per file upload', 'Password protected links', 'Custom expiration dates', 'Priority pinning & CDN'] },
+  { id: 'enterprise', name: 'Enterprise Vault', quotaGB: 1024, quotaBytes: 1024 * 1024 * 1024 * 1024, price: '$29.99 / mo', features: ['1 TB Dedicated IPFS nodes', 'Multi-sig smart contract access', 'Unlimited bandwidth & downloads', 'Dedicated SLA & audit compliance'] }
+];
+
+export const getStoredFolders = () => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY_FOLDERS);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveStoredFolders = (folders) => {
+  localStorage.setItem(STORAGE_KEY_FOLDERS, JSON.stringify(folders));
+};
+
+export const getActiveStoragePlan = () => {
+  try {
+    const id = localStorage.getItem(STORAGE_KEY_PLAN) || 'starter';
+    return STORAGE_PLANS.find((p) => p.id === id) || STORAGE_PLANS[0];
+  } catch {
+    return STORAGE_PLANS[0];
+  }
+};
+
+export const setActiveStoragePlan = (planId) => {
+  localStorage.setItem(STORAGE_KEY_PLAN, planId);
+  return getActiveStoragePlan();
+};
 
 export const getPersonaNameByAddress = (address) => {
   if (!address) return 'Unknown';
@@ -215,7 +250,8 @@ export const contractService = {
   },
 
   // 1. Register File on Blockchain
-  async registerFile(ipfsHash, fileName, fileType, fileSize, currentAddress, sha256Hash = '', encryptionKey = '', iv = null, threatAnalysis = null) {
+  async registerFile(ipfsHash, fileName, fileType, fileSize, currentAddress, sha256Hash = '', encryptionKey = '', iv = null, threatAnalysis = null, options = {}) {
+    const { folderId = null, linkPassword = null } = options;
     const cleanAddress = (currentAddress || '0x71c67ed3e80435a55611f476c66337051b7b292a').toLowerCase();
     const files = getStoredFiles();
 
@@ -235,6 +271,9 @@ export const contractService = {
       fileType: fileType || 'application/octet-stream',
       fileSize: fileSize || 1024 * 1024,
       isPublic: false, // Default: Private Sharing (Only specified recipient)
+      status: 'active',
+      folderId: folderId || null,
+      linkPassword: linkPassword || null,
       sha256Hash: sha256Hash || 'a8f92b71d9e2304c8f5a6b7e1290384756102938475610293847561029384756',
       owner: cleanAddress,
       uploadedAt: Date.now(),
@@ -269,6 +308,9 @@ export const contractService = {
           threatLevel: resolvedThreatLevel,
           threatScore: resolvedThreatScore,
           threatAnalysis,
+          folderId: folderId || null,
+          linkPassword: linkPassword || null,
+          status: 'active',
         }),
       });
     } catch (e) {
@@ -817,6 +859,251 @@ export const contractService = {
     try {
       await fetch('/api/files/clear-vault', { method: 'POST' });
     } catch (e) {}
+  },
+
+  // 5d. Folder Management
+  createFolder(name, parentId = null) {
+    const folders = getStoredFolders();
+    const colors = ['#00f2fe', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
+    const newFolder = {
+      id: 'fld_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: name.trim(),
+      parentId: parentId || null,
+      createdAt: Date.now(),
+      color: colors[folders.length % colors.length],
+    };
+    folders.push(newFolder);
+    saveStoredFolders(folders);
+    return newFolder;
+  },
+
+  deleteFolder(folderId) {
+    let folders = getStoredFolders();
+    folders = folders.filter((f) => f.id !== folderId);
+    saveStoredFolders(folders);
+
+    // Unlink files in this folder back to root
+    const files = getStoredFiles();
+    files.forEach((f) => {
+      if (f.folderId === folderId) f.folderId = null;
+    });
+    saveStoredFiles(files);
+    return true;
+  },
+
+  // 5e. Rename File
+  async renameFile(ipfsHash, newName) {
+    const files = getStoredFiles();
+    const file = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!file) throw new Error('File not found in registry');
+    file.fileName = newName.trim();
+    saveStoredFiles(files);
+
+    try {
+      await fetch(`/api/files/rename/${file.ipfsHash}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newName: newName.trim() }),
+      });
+    } catch (e) {}
+    return file;
+  },
+
+  // 5f. Move File to Folder
+  async moveFile(ipfsHash, folderId) {
+    const files = getStoredFiles();
+    const file = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!file) throw new Error('File not found in registry');
+    file.folderId = folderId || null;
+    saveStoredFiles(files);
+
+    try {
+      await fetch(`/api/files/move/${file.ipfsHash}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId }),
+      });
+    } catch (e) {}
+    return file;
+  },
+
+  // 5g. Make a Copy of a File
+  async copyFile(ipfsHash, currentAddress) {
+    const files = getStoredFiles();
+    const original = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!original) throw new Error('File not found in registry');
+
+    const cleanAddress = (currentAddress || original.owner || '0x71c67ed3e80435a55611f476c66337051b7b292a').toLowerCase();
+    const clonedShareId = 'cpy_' + Math.random().toString(36).slice(2, 8);
+    const newFileName = original.fileName.includes('.')
+      ? original.fileName.replace(/(\.[^.]+)$/, ' (Copy)$1')
+      : `${original.fileName} (Copy)`;
+
+    const cloneRecord = {
+      ...original,
+      shareId: clonedShareId,
+      fileName: newFileName,
+      uploadedAt: Date.now(),
+      owner: cleanAddress,
+      status: 'active',
+    };
+
+    files.unshift(cloneRecord);
+    saveStoredFiles(files);
+    return cloneRecord;
+  },
+
+  // 5h. Soft Delete: Move to Trash / Recycle Bin
+  async trashFile(ipfsHash, ownerAddress) {
+    const files = getStoredFiles();
+    const file = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!file) throw new Error('File not found in registry');
+    file.status = 'trashed';
+    file.trashedAt = Date.now();
+    saveStoredFiles(files);
+
+    try {
+      await fetch(`/api/files/trash/${file.ipfsHash}`, { method: 'PUT' });
+    } catch (e) {}
+
+    const logs = getStoredLogs();
+    logs.unshift({
+      txHash: '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32))).map((b) => b.toString(16).padStart(2, '0')).join(''),
+      blockNumber: 18942350 + Math.floor(Math.random() * 50),
+      event: 'FileMovedToTrash',
+      ipfsHash: file.ipfsHash,
+      details: `File "${file.fileName}" moved to Recycle Bin`,
+      timestamp: Date.now(),
+    });
+    saveStoredLogs(logs);
+
+    return file;
+  },
+
+  // 5i. Restore File from Trash
+  async restoreFile(ipfsHash, ownerAddress) {
+    const files = getStoredFiles();
+    const file = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!file) throw new Error('File not found in registry');
+    file.status = 'active';
+    delete file.trashedAt;
+    saveStoredFiles(files);
+
+    try {
+      await fetch(`/api/files/restore/${file.ipfsHash}`, { method: 'PUT' });
+    } catch (e) {}
+
+    const logs = getStoredLogs();
+    logs.unshift({
+      txHash: '0x' + Array.from(crypto.getRandomValues(new Uint8Array(32))).map((b) => b.toString(16).padStart(2, '0')).join(''),
+      blockNumber: 18942360 + Math.floor(Math.random() * 50),
+      event: 'FileRestored',
+      ipfsHash: file.ipfsHash,
+      details: `File "${file.fileName}" restored to active vault`,
+      timestamp: Date.now(),
+    });
+    saveStoredLogs(logs);
+
+    return file;
+  },
+
+  // 5j. Empty Recycle Bin Permanently
+  async emptyTrash() {
+    let files = getStoredFiles();
+    const trashed = files.filter((f) => f.status === 'trashed');
+    files = files.filter((f) => f.status !== 'trashed');
+    saveStoredFiles(files);
+
+    try {
+      await fetch('/api/files/empty-trash', { method: 'POST' });
+    } catch (e) {}
+
+    return trashed.length;
+  },
+
+  // 5k. Set Password Protection on a File Link
+  async setFilePassword(ipfsHash, password) {
+    const files = getStoredFiles();
+    const file = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!file) throw new Error('File not found in registry');
+    file.linkPassword = password && password.trim() ? password.trim() : null;
+    saveStoredFiles(files);
+
+    try {
+      await fetch(`/api/files/set-password/${file.ipfsHash}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: file.linkPassword }),
+      });
+    } catch (e) {}
+    return file;
+  },
+
+  // 5l. Storage Usage Tracking & Breakdown
+  getStorageDetails(userAddress) {
+    const plan = getActiveStoragePlan();
+    const files = getStoredFiles();
+    const cleanUser = (userAddress || '').toLowerCase();
+
+    let usedBytes = 0;
+    let trashedBytes = 0;
+    const categories = {
+      documents: 0,
+      images: 0,
+      presentations: 0,
+      spreadsheets: 0,
+      archives: 0,
+      others: 0,
+    };
+
+    files.forEach((f) => {
+      const isOwner = !cleanUser || (f.owner && f.owner.toLowerCase() === cleanUser);
+      if (!isOwner) return;
+      const size = Number(f.fileSize || 0);
+
+      if (f.status === 'trashed') {
+        trashedBytes += size;
+      } else {
+        usedBytes += size;
+        const name = (f.fileName || '').toLowerCase();
+        if (name.endsWith('.pdf') || name.endsWith('.docx') || name.endsWith('.doc') || name.endsWith('.txt')) {
+          categories.documents += size;
+        } else if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp')) {
+          categories.images += size;
+        } else if (name.endsWith('.pptx') || name.endsWith('.ppt')) {
+          categories.presentations += size;
+        } else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+          categories.spreadsheets += size;
+        } else if (name.endsWith('.zip') || name.endsWith('.tar') || name.endsWith('.gz')) {
+          categories.archives += size;
+        } else {
+          categories.others += size;
+        }
+      }
+    });
+
+    const percent = Math.min(100, Number(((usedBytes / plan.quotaBytes) * 100).toFixed(2)));
+    return {
+      plan,
+      usedBytes,
+      trashedBytes,
+      quotaBytes: plan.quotaBytes,
+      percentUsed: percent,
+      categories,
+      freeBytesRemaining: Math.max(0, plan.quotaBytes - usedBytes),
+    };
   },
 
   // 6. Multi-Barrier Verification Pipeline for Secure Sharing Links

@@ -38,6 +38,17 @@ import {
   Info,
   Link2,
   Cpu,
+  Folder,
+  FolderPlus,
+  FolderOpen,
+  Edit3,
+  Move,
+  Layers,
+  LayoutGrid,
+  List,
+  ArrowUpDown,
+  HardDrive,
+  Zap,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SecureUploadModal } from './SecureUploadModal';
@@ -46,6 +57,7 @@ import { FileDeleteModal } from './FileDeleteModal';
 import { FileMetadataModal } from './FileMetadataModal';
 import { TransactionDetailsModal } from './TransactionDetailsModal';
 import { AIThreatScannerModal } from './AIThreatScannerModal';
+import { StorageUpgradeModal } from './StorageUpgradeModal';
 import { cryptoService } from '../services/cryptoService';
 import { keyManagementService } from '../services/keyManagementService';
 
@@ -157,7 +169,28 @@ export const FileShareManager = ({ onShowToast }) => {
 
   // Secure Upload modal state
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('files'); // 'files' | 'shared_with_me' | 'logs' | 'keys'
+  const [activeTab, setActiveTab] = useState('files'); // 'files' | 'shared_with_me' | 'logs' | 'keys' | 'trash'
+
+  // Folder Management State
+  const [folders, setFolders] = useState(() => contractService.getFolders());
+  const [currentFolderId, setCurrentFolderId] = useState(null); // null = all
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
+  // File Operations State (Rename, Move, Copy)
+  const [renameModalFile, setRenameModalFile] = useState(null);
+  const [newFileNameInput, setNewFileNameInput] = useState('');
+  const [moveModalFile, setMoveModalFile] = useState(null);
+  const [selectedTargetFolderId, setSelectedTargetFolderId] = useState('');
+
+  // Search & Filter & View Mode & Sort State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
+  const [sortOption, setSortOption] = useState('date_desc'); // 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'size_desc' | 'size_asc'
+
+  // Storage System & Quota State
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [storageDetails, setStorageDetails] = useState(() => contractService.getStorageDetails());
 
   // AI File Threat Detector Modal State
   const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
@@ -262,6 +295,113 @@ export const FileShareManager = ({ onShowToast }) => {
       setFiles(getStoredFiles());
     }
     setLogs(getStoredLogs());
+    setFolders(contractService.getFolders());
+    setStorageDetails(contractService.getStorageDetails());
+  };
+
+  // Active, Trashed, and Recent collections
+  const activeFiles = files.filter((f) => f && f.status !== 'trashed' && f.status !== 'crypto_shredded');
+  const trashedFiles = files.filter((f) => f && f.status === 'trashed');
+  const recentFiles = [...activeFiles]
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .slice(0, 5);
+
+  // File Operation Handlers
+  const handleRenameFile = async (e) => {
+    if (e) e.preventDefault();
+    if (!renameModalFile || !newFileNameInput.trim()) return;
+    try {
+      await contractService.renameFile(renameModalFile.ipfsHash, newFileNameInput.trim());
+      if (onShowToast) onShowToast(`File renamed to "${newFileNameInput.trim()}"`);
+      setRenameModalFile(null);
+      setNewFileNameInput('');
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleMoveFile = async (e) => {
+    if (e) e.preventDefault();
+    if (!moveModalFile) return;
+    try {
+      const target = folders.find((f) => f.id === selectedTargetFolderId);
+      const name = target ? target.name : 'Root Vault';
+      await contractService.moveFile(moveModalFile.ipfsHash, selectedTargetFolderId || null);
+      if (onShowToast) onShowToast(`File moved to "${name}"`);
+      setMoveModalFile(null);
+      setSelectedTargetFolderId('');
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleCopyFile = async (file) => {
+    try {
+      const copy = await contractService.copyFile(file.ipfsHash);
+      if (onShowToast) onShowToast(`Duplicate created: "${copy.fileName}"`);
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleTrashFile = async (file) => {
+    try {
+      await contractService.trashFile(file.ipfsHash);
+      if (onShowToast) onShowToast(`File "${file.fileName}" moved to Trash.`);
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleRestoreFile = async (file) => {
+    try {
+      await contractService.restoreFile(file.ipfsHash);
+      if (onShowToast) onShowToast(`File "${file.fileName}" restored to vault!`);
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    if (!confirm('Are you sure you want to permanently crypto-shred all files in the Trash? This cannot be undone.')) return;
+    try {
+      const res = await contractService.emptyTrash();
+      if (onShowToast) onShowToast(`Recycle bin emptied! (${res.deletedCount || trashedFiles.length} files destroyed)`);
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleCreateFolder = async (e) => {
+    if (e) e.preventDefault();
+    if (!newFolderName.trim()) return;
+    try {
+      const created = await contractService.createFolder(newFolderName.trim());
+      if (onShowToast) onShowToast(`Folder "${created.name}" created!`);
+      setNewFolderName('');
+      setIsFolderModalOpen(false);
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteFolder = async (folderId, folderName) => {
+    if (!confirm(`Delete folder "${folderName}"? Files inside will be moved to Root.`)) return;
+    try {
+      await contractService.deleteFolder(folderId);
+      if (currentFolderId === folderId) setCurrentFolderId(null);
+      if (onShowToast) onShowToast(`Folder "${folderName}" deleted.`);
+      await refreshData();
+    } catch (err) {
+      if (onShowToast) onShowToast(err.message, 'error');
+    }
   };
 
   useEffect(() => {
@@ -781,6 +921,159 @@ export const FileShareManager = ({ onShowToast }) => {
         </div>
       </div>
 
+      {/* Storage System Quota Tracking & Upgrade Bar */}
+      <div
+        className="glass-panel"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+          border: '1px solid rgba(0, 242, 254, 0.25)',
+          borderRadius: 'var(--radius-md)',
+          padding: '1rem 1.35rem',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flex: 1, minWidth: '280px' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '10px',
+            background: 'rgba(0, 242, 254, 0.15)',
+            color: 'var(--accent-cyan)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            border: '1px solid rgba(0, 242, 254, 0.35)',
+          }}>
+            <HardDrive size={22} />
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.92rem', color: '#f8fafc' }}>
+                  Decentralized Storage Quota
+                </span>
+                <span className="badge badge-cyan" style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem' }}>
+                  {storageDetails?.plan?.name || 'Starter Free Tier'} ({storageDetails?.plan?.quotaGB || 10} GB)
+                </span>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
+                {storageDetails?.usedMB || '0.0'} MB used / {storageDetails?.plan?.quotaGB || 10} GB ({storageDetails?.usedPercentage || '0.0'}%)
+              </span>
+            </div>
+
+            {/* Visual Quota Bar */}
+            <div style={{
+              width: '100%',
+              height: '7px',
+              borderRadius: '999px',
+              background: 'rgba(255,255,255,0.08)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${Math.min(parseFloat(storageDetails?.usedPercentage || 0.1), 100)}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #00f2fe 0%, #10b981 100%)',
+                borderRadius: '999px',
+                boxShadow: '0 0 10px rgba(0, 242, 254, 0.4)',
+              }} />
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setIsUpgradeModalOpen(true)}
+          style={{
+            fontSize: '0.82rem',
+            padding: '0.5rem 1rem',
+            borderColor: 'rgba(245, 158, 11, 0.45)',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%)',
+            color: '#fbbf24',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 700,
+          }}
+        >
+          <Zap size={15} color="#fbbf24" />
+          <span>Storage Upgrade Plans</span>
+        </button>
+      </div>
+
+      {/* Recently Uploaded Files Shelf (Horizontal Strip) */}
+      {recentFiles.length > 0 && (
+        <div style={{
+          background: 'rgba(0,0,0,0.28)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 'var(--radius-md)',
+          padding: '0.85rem 1.15rem',
+          marginBottom: '1.25rem',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              🕒 Recently Uploaded Files ({recentFiles.length})
+            </span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              Instant Decrypt &amp; Share
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.65rem' }}>
+            {recentFiles.map((rf) => (
+              <div
+                key={rf.ipfsHash}
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '8px',
+                  padding: '0.65rem 0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                }}
+              >
+                <div style={{ overflow: 'hidden' }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {rf.fileName}
+                  </p>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>
+                    {(rf.fileSize / (1024 * 1024)).toFixed(1)} MB &bull; {new Date(rf.timestamp || Date.now()).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleDownloadAndDecrypt(rf)}
+                    style={{ padding: '0.25rem 0.45rem', fontSize: '0.72rem' }}
+                    title="Download & Decrypt"
+                  >
+                    <Download size={12} color="var(--accent-emerald)" />
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setSecureLinkModalFile(rf)}
+                    style={{ padding: '0.25rem 0.45rem', fontSize: '0.72rem' }}
+                    title="Share Link"
+                  >
+                    <Share2 size={12} color="var(--accent-cyan)" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Main Tabs Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -793,7 +1086,7 @@ export const FileShareManager = ({ onShowToast }) => {
             }}
           >
             <FileText size={16} />
-            <span>📁 My Files ({files.length})</span>
+            <span>📁 My Files ({activeFiles.length})</span>
           </button>
           <button
             className="btn btn-secondary"
@@ -814,6 +1107,18 @@ export const FileShareManager = ({ onShowToast }) => {
           </button>
           <button
             className="btn btn-secondary"
+            onClick={() => setActiveTab('trash')}
+            style={{
+              background: activeTab === 'trash' ? 'rgba(244, 63, 94, 0.15)' : undefined,
+              borderColor: activeTab === 'trash' ? '#f43f5e' : undefined,
+              color: trashedFiles.length > 0 ? '#fda4af' : undefined,
+            }}
+          >
+            <Trash2 size={16} color={activeTab === 'trash' ? '#f43f5e' : 'var(--text-secondary)'} />
+            <span>🗑️ Trash &amp; Recycle Bin ({trashedFiles.length})</span>
+          </button>
+          <button
+            className="btn btn-secondary"
             onClick={() => setActiveTab('logs')}
             style={{
               background: activeTab === 'logs' ? 'rgba(139, 92, 246, 0.15)' : undefined,
@@ -821,7 +1126,7 @@ export const FileShareManager = ({ onShowToast }) => {
             }}
           >
             <Blocks size={16} />
-            <span>Blockchain Event Logs ({logs.length})</span>
+            <span>Blockchain Logs ({logs.length})</span>
           </button>
           <button
             className="btn btn-secondary"
@@ -832,7 +1137,7 @@ export const FileShareManager = ({ onShowToast }) => {
             }}
           >
             <Key size={16} />
-            <span>Key Management & Envelope Architecture</span>
+            <span>Key Management &amp; Envelope</span>
           </button>
         </div>
 
@@ -999,49 +1304,260 @@ export const FileShareManager = ({ onShowToast }) => {
             </div>
           )}
           
-          {/* MY FILES Section Banner & Filter */}
+          {/* Folders Management & Breadcrumbs */}
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1.15rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.65rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {/* Breadcrumb Navigation */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentFolderId(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: currentFolderId === null ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                    fontWeight: currentFolderId === null ? 700 : 500,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  🏠 Root Vault
+                </button>
+                {currentFolderId && (
+                  <>
+                    <span style={{ color: 'var(--text-muted)' }}>&gt;</span>
+                    <span style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>
+                      📁 {folders.find((f) => f.id === currentFolderId)?.name || currentFolderId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentFolderId(null)}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.7rem',
+                        padding: '1px 6px',
+                        cursor: 'pointer',
+                        marginLeft: '4px',
+                      }}
+                    >
+                      Back to All
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* + New Folder Button */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsFolderModalOpen(true)}
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.8rem', borderColor: 'rgba(0, 242, 254, 0.4)', color: 'var(--accent-cyan)' }}
+              >
+                <FolderPlus size={14} />
+                <span>+ New Folder</span>
+              </button>
+            </div>
+
+            {/* Folder Cards List */}
+            {folders.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '4px' }}>
+                <div
+                  onClick={() => setCurrentFolderId(null)}
+                  style={{
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '8px',
+                    background: currentFolderId === null ? 'rgba(0, 242, 254, 0.15)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${currentFolderId === null ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.08)'}`,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    fontSize: '0.78rem',
+                    flexShrink: 0,
+                  }}
+                >
+                  <FolderOpen size={14} color="var(--accent-cyan)" />
+                  <span style={{ fontWeight: currentFolderId === null ? 700 : 500 }}>All Folders ({activeFiles.length})</span>
+                </div>
+
+                {folders.map((fld) => {
+                  const isCurrent = currentFolderId === fld.id;
+                  const count = activeFiles.filter((f) => f.folderId === fld.id).length;
+                  return (
+                    <div
+                      key={fld.id}
+                      onClick={() => setCurrentFolderId(fld.id)}
+                      style={{
+                        padding: '0.45rem 0.85rem',
+                        borderRadius: '8px',
+                        background: isCurrent ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${isCurrent ? 'var(--accent-purple)' : 'rgba(255,255,255,0.08)'}`,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.78rem',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Folder size={14} color={isCurrent ? 'var(--accent-purple)' : 'var(--text-muted)'} />
+                      <span style={{ fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#c084fc' : '#f8fafc' }}>
+                        {fld.name}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({count})</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteFolder(fld.id, fld.name);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#fb7185', cursor: 'pointer', padding: '0 2px', fontSize: '0.85rem' }}
+                        title="Delete Folder"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Search, Filter, Sort, and View Mode Toolbar */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: '0.75rem',
-            padding: '0.85rem 1.25rem',
+            padding: '0.85rem 1.15rem',
             background: 'rgba(0, 242, 254, 0.04)',
             borderRadius: 'var(--radius-sm)',
             border: '1px solid rgba(0, 242, 254, 0.15)',
           }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '0.5px', color: 'var(--accent-cyan)' }}>
-                  📁 MY FILES
-                </span>
-                <span className="badge badge-cyan" style={{ fontSize: '0.72rem' }}>
-                  On-Chain Vault
-                </span>
-              </div>
-              <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                User ko apni uploaded files dikhengi (with Share, Download, Delete, Details actions).
-              </p>
+            {/* Live Search Input */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px', maxWidth: '360px' }}>
+              <Search size={15} color="var(--accent-cyan)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Search files by name, CID, owner..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.45rem 0.75rem 0.45rem 2.1rem',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(0,0,0,0.35)',
+                  color: '#fff',
+                  fontSize: '0.8rem',
+                }}
+              />
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Ownership filter */}
               <button
                 type="button"
                 className={`btn ${fileFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setFileFilter('all')}
-                style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem' }}
+                style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
               >
-                All Files ({files.length})
+                All ({activeFiles.length})
               </button>
               <button
                 type="button"
                 className={`btn ${fileFilter === 'my_files' ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setFileFilter('my_files')}
-                style={{ fontSize: '0.78rem', padding: '0.35rem 0.85rem' }}
+                style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
               >
-                My Uploaded ({files.filter((f) => f.owner.toLowerCase() === activePersona.address.toLowerCase()).length})
+                My Uploaded ({activeFiles.filter((f) => f.owner.toLowerCase() === activePersona.address.toLowerCase()).length})
               </button>
+
+              {/* Sort by Name, Date, Size */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowUpDown size={13} color="var(--text-muted)" />
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value)}
+                  style={{
+                    background: 'rgba(0,0,0,0.4)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '6px',
+                    color: '#f8fafc',
+                    fontSize: '0.76rem',
+                    padding: '0.35rem 0.55rem',
+                  }}
+                >
+                  <option value="date_desc">Date: Newest First</option>
+                  <option value="date_asc">Date: Oldest First</option>
+                  <option value="name_asc">Name: A to Z</option>
+                  <option value="name_desc">Name: Z to A</option>
+                  <option value="size_desc">Size: Largest First</option>
+                  <option value="size_asc">Size: Smallest First</option>
+                </select>
+              </div>
+
+              {/* Grid / List View Toggle */}
+              <div style={{
+                display: 'inline-flex',
+                background: 'rgba(0,0,0,0.35)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '6px',
+                padding: '2px',
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  style={{
+                    background: viewMode === 'list' ? 'rgba(0, 242, 254, 0.2)' : 'none',
+                    border: 'none',
+                    color: viewMode === 'list' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                    borderRadius: '4px',
+                    padding: '3px 7px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.74rem',
+                  }}
+                  title="List View"
+                >
+                  <List size={13} />
+                  <span>List</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  style={{
+                    background: viewMode === 'grid' ? 'rgba(0, 242, 254, 0.2)' : 'none',
+                    border: 'none',
+                    color: viewMode === 'grid' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                    borderRadius: '4px',
+                    padding: '3px 7px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.74rem',
+                  }}
+                  title="Grid View"
+                >
+                  <LayoutGrid size={13} />
+                  <span>Grid</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1115,22 +1631,39 @@ export const FileShareManager = ({ onShowToast }) => {
             </div>
           )}
 
-          {files.filter((f) => fileFilter === 'all' || f.owner.toLowerCase() === activePersona.address.toLowerCase()).length === 0 ? (
+          {displayedFiles.length === 0 ? (
             <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
               <FileText size={44} style={{ opacity: 0.35, margin: '0 auto 0.75rem' }} />
-              <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>No Files Uploaded Yet</h4>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                {searchQuery.trim() || currentFolderId ? 'No Matching Files Found' : 'No Files Uploaded Yet'}
+              </h4>
               <p style={{ margin: '0.5rem 0 1.25rem', fontSize: '0.85rem' }}>
-                Your decentralized file vault is currently empty. Encrypt and upload your first file to the blockchain.
+                {searchQuery.trim()
+                  ? `No files match query "${searchQuery}". Try a different search term.`
+                  : currentFolderId
+                  ? 'This folder is currently empty. Upload files or move files here.'
+                  : 'Your decentralized file vault is currently empty. Encrypt and upload your first file to the blockchain.'}
               </p>
-              <button className="btn btn-primary" onClick={() => setIsUploadModalOpen(true)} style={{ margin: '0 auto' }}>
-                <Plus size={16} />
-                <span>+ Upload & Encrypt File</span>
-              </button>
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
+                {(searchQuery.trim() || currentFolderId) && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setCurrentFolderId(null);
+                    }}
+                  >
+                    Clear Search &amp; Folder
+                  </button>
+                )}
+                <button className="btn btn-primary" onClick={() => setIsUploadModalOpen(true)}>
+                  <Plus size={16} />
+                  <span>+ Upload &amp; Encrypt File</span>
+                </button>
+              </div>
             </div>
           ) : (
-            files
-              .filter((f) => fileFilter === 'all' || f.owner.toLowerCase() === activePersona.address.toLowerCase())
-              .map((file) => {
+            displayedFiles.map((file) => {
               const activeAddr = (activePersona?.address || '').toLowerCase();
               const userWallet = (user?.walletAddress || '').toLowerCase();
               const userEmail = (user?.email || activePersona?.email || '').toLowerCase();
@@ -1597,22 +2130,82 @@ export const FileShareManager = ({ onShowToast }) => {
                         </button>
                       )}
 
-                      {/* [Delete] */}
+                      {/* [Rename Button] */}
+                      {isOwner && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setRenameModalFile(file);
+                            setNewFileNameInput(file.fileName);
+                          }}
+                          title="Rename file"
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                        >
+                          <Edit3 size={14} color="var(--accent-purple)" />
+                          <span>Rename</span>
+                        </button>
+                      )}
+
+                      {/* [Move to Folder Button] */}
+                      {isOwner && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setMoveModalFile(file);
+                            setSelectedTargetFolderId(file.folderId || '');
+                          }}
+                          title="Move to Folder"
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                        >
+                          <Move size={14} color="var(--accent-emerald)" />
+                          <span>Move</span>
+                        </button>
+                      )}
+
+                      {/* [Copy / Duplicate File] */}
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleCopyFile(file)}
+                        title="Duplicate / Copy file"
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                      >
+                        <Copy size={14} color="var(--accent-cyan)" />
+                        <span>Copy</span>
+                      </button>
+
+                      {/* [Move to Trash (Recycle Bin)] */}
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleTrashFile(file)}
+                        disabled={!isOwner}
+                        title="Move to Trash / Recycle Bin"
+                        style={{
+                          fontSize: '0.82rem',
+                          padding: '0.45rem 0.85rem',
+                          color: isOwner ? '#fbbf24' : 'var(--text-muted)',
+                          borderColor: isOwner ? 'rgba(245, 158, 11, 0.4)' : undefined,
+                        }}
+                      >
+                        <Trash2 size={14} color={isOwner ? '#fbbf24' : undefined} />
+                        <span>Trash</span>
+                      </button>
+
+                      {/* [Permanent Crypto-Shred Delete] */}
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleDeleteFile(file)}
                         disabled={!isOwner}
-                        title={isOwner ? "Delete & unregister file from blockchain" : "Only file owner can delete"}
+                        title={isOwner ? "Delete & crypto-shred from blockchain" : "Only file owner can delete"}
                         style={{
-                          fontSize: '0.85rem',
-                          padding: '0.45rem 1rem',
+                          fontSize: '0.82rem',
+                          padding: '0.45rem 0.85rem',
                           color: isOwner ? '#fb7185' : 'var(--text-muted)',
                           borderColor: isOwner ? 'rgba(244, 63, 94, 0.4)' : undefined,
                           background: isOwner ? 'rgba(244, 63, 94, 0.08)' : undefined,
                         }}
                       >
-                        <Trash2 size={15} />
-                        <span style={{ fontWeight: 600 }}>Delete</span>
+                        <ShieldAlert size={14} color="#f43f5e" />
+                        <span>Crypto-Shred</span>
                       </button>
 
                       {/* [🧾 Metadata] */}
@@ -1693,6 +2286,147 @@ export const FileShareManager = ({ onShowToast }) => {
                 </div>
               );
             })
+          )}
+        </div>
+      )}
+
+      {/* Tab: TRASH & RECYCLE BIN View */}
+      {activeTab === 'trash' && (
+        <div className="glass-panel" style={{ padding: '1.75rem' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ background: 'rgba(244, 63, 94, 0.15)', padding: '0.5rem', borderRadius: '10px' }}>
+                  <Trash2 size={24} color="#f43f5e" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.3rem', margin: 0, fontWeight: 700 }}>🗑️ Trash &amp; Recycle Bin</h3>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Deleted files stay here safely before permanent crypto-shredding. Restore anytime.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {trashedFiles.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleEmptyTrash}
+                style={{
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 1rem',
+                  borderColor: 'rgba(244, 63, 94, 0.45)',
+                  background: 'rgba(244, 63, 94, 0.1)',
+                  color: '#fb7185',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Empty Trash (Permanent Crypto-Shred All)</span>
+              </button>
+            )}
+          </div>
+
+          {trashedFiles.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
+              <Trash2 size={44} style={{ opacity: 0.25, margin: '0 auto 0.75rem' }} />
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Trash &amp; Recycle Bin is Empty</h4>
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem' }}>
+                When you delete files from your vault, they will appear here and can be restored at any time.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {trashedFiles.map((file) => (
+                <div
+                  key={file.ipfsHash}
+                  style={{
+                    background: 'rgba(0,0,0,0.35)',
+                    border: '1px solid rgba(244, 63, 94, 0.25)',
+                    borderRadius: '10px',
+                    padding: '1rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '1rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      background: 'rgba(244, 63, 94, 0.15)',
+                      color: '#fb7185',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <FileText size={20} />
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc' }}>
+                          {file.fileName}
+                        </h4>
+                        <span className="badge badge-rose" style={{ fontSize: '0.68rem' }}>
+                          In Recycle Bin
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                        {(file.fileSize / (1024 * 1024)).toFixed(2)} MB &bull; Deleted on {new Date(file.trashedAt || Date.now()).toLocaleDateString()} &bull; IPFS CID: <code className="mono" style={{ color: 'var(--accent-cyan)' }}>{truncate(file.ipfsHash, 14)}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.6rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => handleRestoreFile(file)}
+                      style={{
+                        fontSize: '0.82rem',
+                        padding: '0.45rem 0.95rem',
+                        background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <RotateCcw size={14} />
+                      <span>Restore File</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleDeleteFile(file)}
+                      style={{
+                        fontSize: '0.82rem',
+                        padding: '0.45rem 0.95rem',
+                        color: '#fb7185',
+                        borderColor: 'rgba(244, 63, 94, 0.4)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                    >
+                      <ShieldAlert size={14} color="#f43f5e" />
+                      <span>Permanent Crypto-Shred</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -2799,6 +3533,162 @@ export const FileShareManager = ({ onShowToast }) => {
         }}
         onShowToast={onShowToast}
       />
+
+      {/* ⚡ Storage Upgrade Plans Modal */}
+      <StorageUpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        userAddress={activePersona.address}
+        onShowToast={onShowToast}
+        onPlanChanged={() => refreshData()}
+      />
+
+      {/* 📁 Create New Folder Modal */}
+      {isFolderModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsFolderModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem' }}>
+              <div style={{ background: 'rgba(0, 242, 254, 0.15)', padding: '0.5rem', borderRadius: '10px' }}>
+                <FolderPlus size={22} color="var(--accent-cyan)" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Create New Folder</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Organize decentralized encrypted files</span>
+              </div>
+            </div>
+            <form onSubmit={handleCreateFolder}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Folder Name:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Financial Reports, Projects..."
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 242, 254, 0.35)',
+                    background: 'rgba(0,0,0,0.4)',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsFolderModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={!newFolderName.trim()}>
+                  Create Folder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✏️ Rename File Modal */}
+      {renameModalFile && (
+        <div className="modal-overlay" onClick={() => setRenameModalFile(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem' }}>
+              <div style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '0.5rem', borderRadius: '10px' }}>
+                <Edit3 size={22} color="var(--accent-purple)" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Rename File</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Updates file name across vault and links</span>
+              </div>
+            </div>
+            <form onSubmit={handleRenameFile}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  New File Name:
+                </label>
+                <input
+                  type="text"
+                  value={newFileNameInput}
+                  onChange={(e) => setNewFileNameInput(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                    background: 'rgba(0,0,0,0.4)',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setRenameModalFile(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={!newFileNameInput.trim()}>
+                  Save Name
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔄 Move File to Folder Modal */}
+      {moveModalFile && (
+        <div className="modal-overlay" onClick={() => setMoveModalFile(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '0.5rem', borderRadius: '10px' }}>
+                <Move size={22} color="var(--accent-emerald)" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Move File to Folder</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Choose destination folder</span>
+              </div>
+            </div>
+            <form onSubmit={handleMoveFile}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Target Destination:
+                </label>
+                <select
+                  value={selectedTargetFolderId}
+                  onChange={(e) => setSelectedTargetFolderId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    background: 'rgba(0,0,0,0.5)',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <option value="">📁 Root Vault (Default)</option>
+                  {folders.map((fld) => (
+                    <option key={fld.id} value={fld.id}>
+                      📁 {fld.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setMoveModalFile(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Move File
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

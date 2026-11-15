@@ -462,6 +462,8 @@ Status: ${accessStatus}`;
     threatLevel,
     threatScore,
     threatAnalysis: file.threatAnalysis || null,
+    folderId: file.folderId || null,
+    hasPassword: !!file.linkPassword,
     uploadDate,
     uploadTimestamp: file.uploadedAt || Date.now(),
     expiry: expiryDisplay,
@@ -519,6 +521,9 @@ router.get('/share-meta/:token', (req, res) => {
         owner: match.owner,
         ownerName: match.ownerName,
         uploadedAt: match.uploadedAt,
+        hasPassword: !!match.linkPassword,
+        status: match.status || 'active',
+        folderId: match.folderId || null,
       },
     });
   } catch (error) {
@@ -617,6 +622,230 @@ router.put('/share-mode/:ipfsHash', (req, res) => {
   }
 });
 
+// @desc    Rename a file in server registry
+// @route   PUT /api/files/rename/:ipfsHash
+// @access  Public / Authenticated
+router.put('/rename/:ipfsHash', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash } = req.params;
+    const { newName } = req.body;
+    if (!newName || !newName.trim()) {
+      return res.status(400).json({ success: false, message: 'New file name is required' });
+    }
+    const cleanHash = ipfsHash.toLowerCase().trim();
+    const file = SERVER_SHARE_REGISTRY.find(
+      (f) => f.ipfsHash.toLowerCase() === cleanHash || (f.shareId && f.shareId.toLowerCase() === cleanHash)
+    );
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+    file.fileName = newName.trim();
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`✏️ [File Renamed] "${file.fileName}" (${file.ipfsHash})`);
+    res.status(200).json({ success: true, file });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Move a file into a folder (or root)
+// @route   PUT /api/files/move/:ipfsHash
+// @access  Public / Authenticated
+router.put('/move/:ipfsHash', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash } = req.params;
+    const { folderId } = req.body;
+    const cleanHash = ipfsHash.toLowerCase().trim();
+    const file = SERVER_SHARE_REGISTRY.find(
+      (f) => f.ipfsHash.toLowerCase() === cleanHash || (f.shareId && f.shareId.toLowerCase() === cleanHash)
+    );
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+    file.folderId = folderId || null;
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`📁 [File Moved] "${file.fileName}" -> folder: ${folderId || 'Root'}`);
+    res.status(200).json({ success: true, file });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Move file to Trash (Soft Delete)
+// @route   PUT /api/files/trash/:ipfsHash
+// @access  Public / Authenticated
+router.put('/trash/:ipfsHash', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash } = req.params;
+    const cleanHash = ipfsHash.toLowerCase().trim();
+    const file = SERVER_SHARE_REGISTRY.find(
+      (f) => f.ipfsHash.toLowerCase() === cleanHash || (f.shareId && f.shareId.toLowerCase() === cleanHash)
+    );
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+    file.status = 'trashed';
+    file.trashedAt = Date.now();
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`🗑️ [File Trashed] "${file.fileName}" moved to Recycle Bin`);
+    res.status(200).json({ success: true, file });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Restore file from Trash
+// @route   PUT /api/files/restore/:ipfsHash
+// @access  Public / Authenticated
+router.put('/restore/:ipfsHash', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash } = req.params;
+    const cleanHash = ipfsHash.toLowerCase().trim();
+    const file = SERVER_SHARE_REGISTRY.find(
+      (f) => f.ipfsHash.toLowerCase() === cleanHash || (f.shareId && f.shareId.toLowerCase() === cleanHash)
+    );
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+    file.status = 'active';
+    delete file.trashedAt;
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`♻️ [File Restored] "${file.fileName}" restored to active vault`);
+    res.status(200).json({ success: true, file });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Empty Trash (Permanently purge all trashed files and unpin chunks)
+// @route   POST /api/files/empty-trash
+// @access  Public / Authenticated
+router.post('/empty-trash', optionalAuth, (req, res) => {
+  try {
+    const trashedFiles = SERVER_SHARE_REGISTRY.filter((f) => f.status === 'trashed');
+    trashedFiles.forEach((tf) => {
+      const binFile = path.join(IPFS_DIR, `${tf.ipfsHash}.bin`);
+      const metaFile = path.join(IPFS_DIR, `${tf.ipfsHash}.meta.json`);
+      if (fs.existsSync(binFile)) try { fs.unlinkSync(binFile); } catch (e) {}
+      if (fs.existsSync(metaFile)) try { fs.unlinkSync(metaFile); } catch (e) {}
+    });
+    SERVER_SHARE_REGISTRY = SERVER_SHARE_REGISTRY.filter((f) => f.status !== 'trashed');
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`🧹 [Recycle Bin Emptied] Purged ${trashedFiles.length} files permanently.`);
+    res.status(200).json({ success: true, purgedCount: trashedFiles.length });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Set password protection on a file link
+// @route   POST /api/files/set-password/:ipfsHash
+// @access  Public / Authenticated
+router.post('/set-password/:ipfsHash', optionalAuth, (req, res) => {
+  try {
+    const { ipfsHash } = req.params;
+    const { password } = req.body;
+    const cleanHash = ipfsHash.toLowerCase().trim();
+    const file = SERVER_SHARE_REGISTRY.find(
+      (f) => f.ipfsHash.toLowerCase() === cleanHash || (f.shareId && f.shareId.toLowerCase() === cleanHash)
+    );
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+    file.linkPassword = password && password.trim() ? password.trim() : null;
+    saveServerFiles(SERVER_SHARE_REGISTRY);
+    console.log(`🔐 [Password Protection] "${file.fileName}" password ${file.linkPassword ? 'enabled' : 'removed'}`);
+    res.status(200).json({ success: true, hasPassword: !!file.linkPassword });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Verify passcode for password-protected link
+// @route   POST /api/files/verify-password
+// @access  Public
+router.post('/verify-password', (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token) return res.status(400).json({ success: false, message: 'Token required' });
+    const clean = token.toLowerCase().trim();
+    const file = SERVER_SHARE_REGISTRY.find(
+      (f) => (f.shareId && f.shareId.toLowerCase() === clean) || f.ipfsHash.toLowerCase().includes(clean)
+    );
+    if (!file) return res.status(404).json({ success: false, message: 'File not found' });
+    if (!file.linkPassword) return res.status(200).json({ success: true, verified: true, hasPassword: false });
+    
+    if (file.linkPassword === (password || '').trim()) {
+      return res.status(200).json({ success: true, verified: true });
+    } else {
+      return res.status(401).json({ success: false, verified: false, message: 'Incorrect passcode entered.' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// @desc    Get detailed storage usage analytics and quota tracking
+// @route   GET /api/files/storage-stats
+// @access  Public
+router.get('/storage-stats', (req, res) => {
+  try {
+    const DEFAULT_QUOTA = 10 * 1024 * 1024 * 1024; // 10 GB Free Tier
+    let totalUsedBytes = 0;
+    let trashedBytes = 0;
+    const categories = {
+      documents: 0,
+      images: 0,
+      presentations: 0,
+      spreadsheets: 0,
+      archives: 0,
+      others: 0,
+    };
+
+    SERVER_SHARE_REGISTRY.forEach((f) => {
+      const size = Number(f.fileSize || 0);
+      if (f.status === 'trashed') {
+        trashedBytes += size;
+      } else {
+        totalUsedBytes += size;
+        const name = (f.fileName || '').toLowerCase();
+        if (name.endsWith('.pdf') || name.endsWith('.docx') || name.endsWith('.doc') || name.endsWith('.txt')) {
+          categories.documents += size;
+        } else if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp')) {
+          categories.images += size;
+        } else if (name.endsWith('.pptx') || name.endsWith('.ppt')) {
+          categories.presentations += size;
+        } else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+          categories.spreadsheets += size;
+        } else if (name.endsWith('.zip') || name.endsWith('.tar') || name.endsWith('.gz')) {
+          categories.archives += size;
+        } else {
+          categories.others += size;
+        }
+      }
+    });
+
+    const activeFilesCount = SERVER_SHARE_REGISTRY.filter((f) => f.status !== 'trashed').length;
+    const trashedFilesCount = SERVER_SHARE_REGISTRY.filter((f) => f.status === 'trashed').length;
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalUsedBytes,
+        trashedBytes,
+        quotaBytes: DEFAULT_QUOTA,
+        quotaGB: 10,
+        percentUsed: Number(((totalUsedBytes / DEFAULT_QUOTA) * 100).toFixed(2)),
+        activeFilesCount,
+        trashedFilesCount,
+        categories,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // @desc    Get complete active files registry (Synchronized across all users/browsers)
 // @route   GET /api/files/registry
 // @access  Public
@@ -637,7 +866,7 @@ router.get('/registry', (req, res) => {
 // @access  Public / Authenticated
 router.post('/register', optionalAuth, (req, res) => {
   try {
-    const { ipfsHash, fileName, fileType, fileSize, owner, ownerName, sha256Hash, isPublic, encryptionKey, iv, threatLevel, threatScore, threatAnalysis } = req.body;
+    const { ipfsHash, fileName, fileType, fileSize, owner, ownerName, sha256Hash, isPublic, encryptionKey, iv, threatLevel, threatScore, threatAnalysis, folderId, linkPassword, status } = req.body;
     if (!ipfsHash) {
       return res.status(400).json({ success: false, message: 'ipfsHash is required' });
     }
@@ -658,7 +887,9 @@ router.post('/register', optionalAuth, (req, res) => {
       fileType: fileType || 'application/octet-stream',
       fileSize: Number(fileSize) || 0,
       isPublic: !!isPublic,
-      status: 'active',
+      status: status || (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].status : 'active'),
+      folderId: folderId !== undefined ? folderId : (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].folderId : null),
+      linkPassword: linkPassword !== undefined ? linkPassword : (existingIndex !== -1 ? SERVER_SHARE_REGISTRY[existingIndex].linkPassword : null),
       sha256Hash: sha256Hash || '',
       owner: cleanOwner,
       ownerName: cleanOwnerName,
