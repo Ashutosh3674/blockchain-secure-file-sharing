@@ -1,5 +1,17 @@
 [
   {
+    "_id": "6afbe442d59aabb8a4658931",
+    "id": "6afbe442d59aabb8a4658931",
+    "name": "Ashutosh Kumar",
+    "email": "godofthunder119821@gmail.com",
+    "password": "$2a$12$wBIK3i9ZGPV5r7I27Vs6Su4sdEh4wvIq8ZRUKuzw7om6SCxY5eEqi",
+    "walletAddress": "0x62b3f6823428880592380db73b370be3144d8823",
+    "role": "user",
+    "status": "active",
+    "createdAt": "2026-11-17T05:21:06.317Z",
+    "updatedAt": "2026-11-17T05:21:06.317Z"
+  },
+  {
     "_id": "6aae5d08b3b8f8b3603a6379",
     "id": "6aae5d08b3b8f8b3603a6379",
     "name": "Amit",

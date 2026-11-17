@@ -5,6 +5,7 @@ import {
   contractService,
   getStoredFiles,
   getStoredLogs,
+  getStoredFolders,
   getPersonaNameByAddress,
 } from '../services/contractService';
 import {
@@ -172,7 +173,15 @@ export const FileShareManager = ({ onShowToast }) => {
   const [activeTab, setActiveTab] = useState('files'); // 'files' | 'shared_with_me' | 'logs' | 'keys' | 'trash'
 
   // Folder Management State
-  const [folders, setFolders] = useState(() => contractService.getFolders());
+  const [folders, setFolders] = useState(() => {
+    try {
+      return (contractService && typeof contractService.getFolders === 'function')
+        ? contractService.getFolders()
+        : getStoredFolders();
+    } catch {
+      return [];
+    }
+  });
   const [currentFolderId, setCurrentFolderId] = useState(null); // null = all
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -190,7 +199,15 @@ export const FileShareManager = ({ onShowToast }) => {
 
   // Storage System & Quota State
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [storageDetails, setStorageDetails] = useState(() => contractService.getStorageDetails());
+  const [storageDetails, setStorageDetails] = useState(() => {
+    try {
+      return (contractService && typeof contractService.getStorageDetails === 'function')
+        ? contractService.getStorageDetails()
+        : { usedBytes: 0, quotaBytes: 10 * 1024 * 1024 * 1024, percent: 0, plan: { name: 'Free Starter Plan' }, breakdown: {} };
+    } catch {
+      return { usedBytes: 0, quotaBytes: 10 * 1024 * 1024 * 1024, percent: 0, plan: { name: 'Free Starter Plan' }, breakdown: {} };
+    }
+  });
 
   // AI File Threat Detector Modal State
   const [isThreatModalOpen, setIsThreatModalOpen] = useState(false);
@@ -295,8 +312,18 @@ export const FileShareManager = ({ onShowToast }) => {
       setFiles(getStoredFiles());
     }
     setLogs(getStoredLogs());
-    setFolders(contractService.getFolders());
-    setStorageDetails(contractService.getStorageDetails());
+    try {
+      setFolders((contractService && typeof contractService.getFolders === 'function')
+        ? contractService.getFolders()
+        : getStoredFolders());
+    } catch {
+      setFolders([]);
+    }
+    try {
+      if (contractService && typeof contractService.getStorageDetails === 'function') {
+        setStorageDetails(contractService.getStorageDetails());
+      }
+    } catch {}
   };
 
   // Active, Trashed, and Recent collections

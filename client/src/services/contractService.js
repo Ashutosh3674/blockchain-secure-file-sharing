@@ -862,6 +862,10 @@ export const contractService = {
   },
 
   // 5d. Folder Management
+  getFolders() {
+    return getStoredFolders();
+  },
+
   createFolder(name, parentId = null) {
     const folders = getStoredFolders();
     const colors = ['#00f2fe', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
@@ -1049,6 +1053,29 @@ export const contractService = {
       });
     } catch (e) {}
     return file;
+  },
+
+  async verifyFilePassword(ipfsHash, password) {
+    const files = getStoredFiles();
+    const file = files.find(
+      (f) => f.ipfsHash === ipfsHash || (f.shareId && f.shareId.toLowerCase() === ipfsHash.toLowerCase())
+    );
+    if (!file) return { valid: false, message: 'File not found' };
+    if (!file.linkPassword) return { valid: true };
+    const localMatch = file.linkPassword === (password || '').trim();
+    if (localMatch) return { valid: true };
+
+    try {
+      const res = await fetch('/api/files/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ipfsHash: file.ipfsHash, password: (password || '').trim() }),
+      });
+      const data = await res.json();
+      return { valid: !!data.valid };
+    } catch {
+      return { valid: localMatch };
+    }
   },
 
   // 5l. Storage Usage Tracking & Breakdown
