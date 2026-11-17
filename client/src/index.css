@@ -809,3 +809,93 @@ h1, h2, h3, h4, h5, h6 {
     word-break: break-all !important;
   }
 }
+
+/* ==========================================================================
+   Landscape Auth Modal (Horizontal & Margined)
+   ========================================================================== */
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  z-index: 10000;
+  animation: fadeIn 0.25s ease-out;
+  overflow-y: auto;
+}
+
+.auth-modal-card {
+  width: 100% !important;
+  max-width: 1060px !important;
+  max-height: calc(100vh - 4rem) !important;
+  margin: auto !important;
+  background: var(--card-bg) !important;
+  border: 1px solid rgba(0, 242, 254, 0.3) !important;
+  border-radius: 24px !important;
+  padding: 0 !important;
+  box-shadow: 
+    0 35px 80px -15px rgba(0, 0, 0, 0.95), 
+    0 0 50px rgba(0, 242, 254, 0.18) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  position: relative !important;
+  overflow: hidden !important;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.auth-left-pane {
+  width: 40%;
+  min-width: 320px;
+  background: linear-gradient(180deg, rgba(0, 242, 254, 0.08) 0%, rgba(139, 92, 246, 0.06) 50%, rgba(3, 7, 18, 0.6) 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow-y: auto;
+}
+
+.auth-right-pane {
+  width: 60%;
+  flex: 1;
+  padding: 2.25rem 2.5rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 4rem);
+  position: relative;
+}
+
+.auth-form-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .auth-modal-card {
+    flex-direction: column !important;
+    max-width: 580px !important;
+    max-height: 90vh !important;
+  }
+  .auth-left-pane {
+    width: 100% !important;
+    min-width: unset !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 1.5rem !important;
+  }
+  .auth-right-pane {
+    width: 100% !important;
+    padding: 1.5rem !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .auth-form-row-2col {
+    grid-template-columns: 1fr !important;
+  }
+}
