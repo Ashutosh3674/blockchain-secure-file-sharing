@@ -781,75 +781,12 @@ export const FileShareManager = ({ onShowToast }) => {
   return (
     <div style={{ marginTop: '1.5rem' }}>
       
-      {/* Persona Switcher Banner */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.75rem', marginBottom: '1.75rem', borderLeft: '4px solid var(--accent-cyan)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Blocks size={18} color="var(--accent-cyan)" />
-              <h4 style={{ fontSize: '1rem', fontWeight: 600 }}>Active Blockchain Identity (msg.sender)</h4>
-            </div>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Switch identity to instantly test how the smart contract allows or denies access based on wallet permissions.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            {availablePersonas.map((p) => {
-              const isSelected = activePersona.address.toLowerCase() === p.address.toLowerCase();
-              return (
-                <button
-                  key={p.id || p.address}
-                  onClick={() => handleSelectPersona(p)}
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '0.45rem 0.85rem',
-                    fontSize: '0.82rem',
-                    borderColor: isSelected ? p.color : 'rgba(255,255,255,0.1)',
-                    background: isSelected ? `rgba(255,255,255,0.1)` : 'rgba(0,0,0,0.2)',
-                    boxShadow: isSelected ? `0 0 12px ${p.color}40` : 'none',
-                  }}
-                >
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: p.color }}></span>
-                  <span>{p.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Current Active Persona Details Bar */}
-        <div style={{
-          marginTop: '1rem',
-          padding: '0.65rem 1rem',
-          background: 'rgba(0,0,0,0.3)',
-          borderRadius: 'var(--radius-sm)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          fontSize: '0.82rem',
-        }}>
-          <div>
-            <span style={{ color: 'var(--text-muted)' }}>Signing transactions as: </span>
-            <b style={{ color: activePersona.color }}>{activePersona.name}</b>
-            <span className="mono" style={{ color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>
-              ({activePersona.address})
-            </span>
-          </div>
-          <span className="badge" style={{ background: `${activePersona.color}20`, color: activePersona.color, border: `1px solid ${activePersona.color}40` }}>
-            Role: {activePersona.role}
-          </span>
-        </div>
-      </div>
-
       {/* SECURESHARE OVERVIEW DASHBOARD */}
       <div className="glass-panel" style={{ padding: '1.5rem 1.75rem', marginBottom: '1.75rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <span style={{ fontSize: '0.72rem', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent-cyan)', fontWeight: 700 }}>
-              Blockchain Identity Portal
+              Decentralized File Vault
             </span>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>SECURESHARE DASHBOARD</span>

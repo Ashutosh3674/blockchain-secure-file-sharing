@@ -1,1 +1,70 @@
-[]
+[
+  {
+    "shareId": "c7e21e28",
+    "ipfsHash": "QmbnupaXuErvjneBewwcpgFoMe5dTYQmcgyVxdMH7kSryk",
+    "fileName": "Project_Report.pdf",
+    "fileType": "application/pdf",
+    "fileSize": 861,
+    "isPublic": false,
+    "status": "active",
+    "sha256Hash": "c7e21e28ca4fcf6730324c812667a41997d583585eabeb9fa241c11003546217",
+    "owner": "0x62b3f6823428880592380db73b370be3144d8823",
+    "ownerName": "Ashutosh",
+    "uploadedAt": 1794894380304,
+    "authorizedRecipients": [],
+    "permissions": {},
+    "threatLevel": "Safe",
+    "threatScore": 25,
+    "threatAnalysis": {
+      "level": "Safe",
+      "score": 25,
+      "badgeColor": "#10b981",
+      "verdict": "File is clean, verified, and safe for decentralized sharing.",
+      "recommendation": "Proceed with AES-256-GCM encryption and IPFS decentralized storage.",
+      "aiSummary": "AI Threat Engine evaluated 14 security vectors across MIME headers, magic bytes, payload patterns, and Shannon entropy (4.836). Zero threats detected. File certified Safe (Score: 25/100).",
+      "entropy": 4.836,
+      "magicBytes": "3D3D3D3D3D3D3D3D",
+      "detectedType": "UNKNOWN",
+      "stats": {
+        "criticalCount": 0,
+        "warningCount": 1,
+        "passCount": 1,
+        "totalFindings": 2
+      },
+      "findings": [
+        {
+          "vector": "Header / Magic Bytes",
+          "severity": "warning",
+          "title": "Non-Standard PDF Header",
+          "desc": "PDF file lacks standard %PDF- magic byte signature."
+        },
+        {
+          "vector": "Entropy Analysis",
+          "severity": "pass",
+          "title": "Entropy Normal",
+          "desc": "File entropy (4.836 / 8.0) is within standard distribution for .pdf."
+        }
+      ],
+      "scannedAt": "2026-11-17T05:46:07.844Z",
+      "verifiedByServer": true
+    },
+    "folderId": null,
+    "linkPassword": null,
+    "wrappedKeys": {},
+    "encryptionKey": "Dc4RISSF25UcW0L9QWz4lGbCNlKGuTZDrep3J9fdYwM=",
+    "iv": [
+      109,
+      19,
+      246,
+      175,
+      11,
+      83,
+      100,
+      103,
+      4,
+      209,
+      70,
+      133
+    ]
+  }
+]

@@ -259,7 +259,7 @@ export const SecureShareView = ({
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Active Identity:</span>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Connected Wallet:</span>
           <div style={{
             display: 'flex',
             alignItems: 'center',
