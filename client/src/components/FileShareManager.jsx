@@ -333,6 +333,54 @@ export const FileShareManager = ({ onShowToast }) => {
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
     .slice(0, 5);
 
+  // Filtered & Sorted files for the main files view
+  const displayedFiles = activeFiles
+    .filter((file) => {
+      if (!file) return false;
+      // 1. Folder filter
+      if (currentFolderId !== null && file.folderId !== currentFolderId) {
+        return false;
+      }
+      // 2. Ownership filter ('all' vs 'my_files')
+      if (fileFilter === 'my_files') {
+        const ownerAddr = (file.owner || '').toLowerCase();
+        const activeAddr = (activePersona?.address || '').toLowerCase();
+        const userWallet = (user?.walletAddress || '').toLowerCase();
+        if (ownerAddr !== activeAddr && ownerAddr !== userWallet) {
+          return false;
+        }
+      }
+      // 3. Search query filter
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = (file.fileName || '').toLowerCase().includes(q);
+        const hashMatch = (file.ipfsHash || '').toLowerCase().includes(q);
+        const ownerMatch = (file.owner || '').toLowerCase().includes(q) || (file.ownerName || '').toLowerCase().includes(q);
+        if (!nameMatch && !hashMatch && !ownerMatch) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortOption === 'name_asc') {
+        return (a.fileName || '').localeCompare(b.fileName || '');
+      }
+      if (sortOption === 'name_desc') {
+        return (b.fileName || '').localeCompare(a.fileName || '');
+      }
+      if (sortOption === 'size_desc') {
+        return (Number(b.fileSize) || 0) - (Number(a.fileSize) || 0);
+      }
+      if (sortOption === 'size_asc') {
+        return (Number(a.fileSize) || 0) - (Number(b.fileSize) || 0);
+      }
+      if (sortOption === 'date_asc') {
+        return (a.uploadedAt || a.timestamp || 0) - (b.uploadedAt || b.timestamp || 0);
+      }
+      return (b.uploadedAt || b.timestamp || 0) - (a.uploadedAt || a.timestamp || 0);
+    });
+
   // File Operation Handlers
   const handleRenameFile = async (e) => {
     if (e) e.preventDefault();
